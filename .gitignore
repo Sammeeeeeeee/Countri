@@ -1,0 +1,10 @@
+.gradle/
+build/
+local.properties
+*.apk
+*.aab
+.kotlin/
+.idea/
+captures/
+tools/cache/
+Countri Travel Tracking App-handoff.zip
