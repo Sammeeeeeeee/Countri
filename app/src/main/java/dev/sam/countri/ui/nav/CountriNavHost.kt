@@ -30,7 +30,9 @@ import dev.sam.countri.ui.AtlasViewModel
 import dev.sam.countri.ui.add.AddCountryScreen
 import dev.sam.countri.ui.atlas.AtlasScreen
 import dev.sam.countri.ui.detail.CountryDetailScreen
+import dev.sam.countri.ui.onboarding.OnboardingScreen
 import dev.sam.countri.ui.passport.PassportScreen
+import dev.sam.countri.ui.stats.StatsScreen
 import dev.sam.countri.ui.theme.Countri
 import dev.sam.countri.ui.theme.CountriType
 import dev.sam.countri.ui.theme.Springs
@@ -117,7 +119,15 @@ fun CountriNavHost(
         composable<OnboardingRoute>(
             exitTransition = { fadeOut(tween(500)) },
         ) {
-            PlaceholderScreen("Onboarding")
+            OnboardingScreen(
+                viewModel = viewModel,
+                onDone = {
+                    viewModel.markOnboardingSeen()
+                    navController.navigate(AtlasRoute) {
+                        popUpTo<OnboardingRoute> { inclusive = true }
+                    }
+                },
+            )
         }
         composable<AtlasRoute> {
             AtlasScreen(
@@ -132,7 +142,7 @@ fun CountriNavHost(
                 onCountryClick = { iso -> navController.navigate(DetailRoute(iso)) },
             )
         }
-        composable<StatsRoute> { PlaceholderScreen("Stats") }
+        composable<StatsRoute> { StatsScreen(viewModel = viewModel) }
         composable<WishlistRoute> {
             WishlistScreen(
                 viewModel = viewModel,

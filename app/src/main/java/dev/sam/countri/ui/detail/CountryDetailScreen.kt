@@ -65,6 +65,7 @@ fun CountryDetailScreen(
     val countries by viewModel.countries.collectAsState()
     val entry = countries.firstOrNull { it.country.iso2 == iso2 } ?: return
     var confirmClear by remember { mutableStateOf(false) }
+    var editTarget by remember { mutableStateOf<EditTarget?>(null) }
 
     val accent = when (entry.status) {
         CountryStatus.VISITED -> palette.visited
@@ -173,37 +174,61 @@ fun CountryDetailScreen(
                         .padding(top = 14.dp),
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
-                    StatCard("First visit", entry.firstVisitYear?.toString() ?: "—", Modifier.weight(1f))
-                    StatCard("Trips", entry.trips.toString(), Modifier.weight(1f))
-                    StatCard("Cities", entry.cities.size.toString(), Modifier.weight(1f))
-                }
-                if (!entry.note.isNullOrBlank()) {
-                    Text(
-                        "“${entry.note}”",
-                        style = CountriType.subtitle.copy(fontStyle = FontStyle.Italic),
-                        color = palette.textPrimary.copy(alpha = 0.82f),
-                        modifier = Modifier.padding(top = 22.dp),
-                    )
-                }
-                if (entry.cities.isNotEmpty()) {
-                    SectionLabel("Cities", Modifier.padding(top = 26.dp, bottom = 12.dp))
-                    FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(9.dp),
-                        verticalArrangement = Arrangement.spacedBy(9.dp),
-                    ) {
-                        entry.cities.forEach { city ->
-                            Text(
-                                city,
-                                style = CountriType.bodySmall,
-                                color = palette.textPrimary,
-                                modifier = Modifier
-                                    .clip(CircleShape)
-                                    .background(palette.surface1)
-                                    .hairline(CircleShape)
-                                    .padding(horizontal = 15.dp, vertical = 8.dp),
-                            )
-                        }
+                    StatCard("First visit", entry.firstVisitYear?.toString() ?: "—", Modifier.weight(1f)) {
+                        editTarget = EditTarget.YearOfVisit
                     }
+                    StatCard("Trips", entry.trips.toString(), Modifier.weight(1f)) {
+                        editTarget = EditTarget.Trips
+                    }
+                    StatCard("Cities", entry.cities.size.toString(), Modifier.weight(1f)) {
+                        editTarget = EditTarget.Cities
+                    }
+                }
+                Text(
+                    text = if (entry.note.isNullOrBlank()) "Add a line to remember it by…"
+                    else "“${entry.note}”",
+                    style = CountriType.subtitle.copy(fontStyle = FontStyle.Italic),
+                    color = if (entry.note.isNullOrBlank()) palette.textFaint
+                    else palette.textPrimary.copy(alpha = 0.82f),
+                    modifier = Modifier
+                        .padding(top = 22.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                        ) { editTarget = EditTarget.Note },
+                )
+                SectionLabel("Cities", Modifier.padding(top = 26.dp, bottom = 12.dp))
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(9.dp),
+                    verticalArrangement = Arrangement.spacedBy(9.dp),
+                ) {
+                    entry.cities.forEach { city ->
+                        Text(
+                            city,
+                            style = CountriType.bodySmall,
+                            color = palette.textPrimary,
+                            modifier = Modifier
+                                .clip(CircleShape)
+                                .background(palette.surface1)
+                                .hairline(CircleShape)
+                                .padding(horizontal = 15.dp, vertical = 8.dp),
+                        )
+                    }
+                    Text(
+                        "+ Add",
+                        style = CountriType.bodySmall,
+                        color = palette.visited,
+                        modifier = Modifier
+                            .pressScale(0.94f)
+                            .clip(CircleShape)
+                            .hairline(CircleShape, palette.visited.copy(alpha = 0.3f))
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null,
+                            ) { editTarget = EditTarget.Cities }
+                            .padding(horizontal = 15.dp, vertical = 8.dp),
+                    )
                 }
             } else if (entry.isWishlist) {
                 Text(
@@ -272,6 +297,33 @@ fun CountryDetailScreen(
             }
             Box(Modifier.navigationBarsPadding())
         }
+    }
+
+    editTarget?.let { target ->
+        DetailEditSheet(
+            target = target,
+            entry = entry,
+            onDismiss = { editTarget = null },
+            onSaveYear = { year ->
+                viewModel.updateDetails(iso2, firstVisitYear = year)
+                editTarget = null
+            },
+            onSaveTrips = { trips ->
+                haptics.confirm()
+                viewModel.updateDetails(iso2, trips = trips)
+                editTarget = null
+            },
+            onSaveNote = { note ->
+                haptics.confirm()
+                viewModel.updateDetails(iso2, note = note)
+                editTarget = null
+            },
+            onSaveCities = { cities ->
+                haptics.confirm()
+                viewModel.updateDetails(iso2, cities = cities)
+                editTarget = null
+            },
+        )
     }
 
     if (confirmClear) {
@@ -343,13 +395,24 @@ private fun locatorZoom(iso2: String): Float = when (iso2) {
 }
 
 @Composable
-private fun StatCard(label: String, value: String, modifier: Modifier = Modifier) {
+private fun StatCard(
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit = {},
+) {
     val palette = Countri.palette
     Column(
         modifier = modifier
+            .pressScale(0.97f)
             .clip(RoundedCornerShape(16.dp))
             .background(palette.surface1)
             .hairline(RoundedCornerShape(16.dp))
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onClick,
+            )
             .padding(15.dp),
     ) {
         Text(
