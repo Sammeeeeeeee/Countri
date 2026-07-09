@@ -1,0 +1,59 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 1,
+    "identityHash": "b30b2ab57e24b2681cb9b4afb46f2a12",
+    "entities": [
+      {
+        "tableName": "country_state",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`iso2` TEXT NOT NULL, `status` TEXT NOT NULL, `firstVisitYear` INTEGER, `note` TEXT, `cities` TEXT NOT NULL, `trips` INTEGER NOT NULL, PRIMARY KEY(`iso2`))",
+        "fields": [
+          {
+            "fieldPath": "iso2",
+            "columnName": "iso2",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "status",
+            "columnName": "status",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "firstVisitYear",
+            "columnName": "firstVisitYear",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "note",
+            "columnName": "note",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "cities",
+            "columnName": "cities",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "trips",
+            "columnName": "trips",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "iso2"
+          ]
+        }
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'b30b2ab57e24b2681cb9b4afb46f2a12')"
+    ]
+  }
+}

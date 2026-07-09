@@ -18,18 +18,27 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.toRoute
+import dev.sam.countri.ui.AtlasViewModel
+import dev.sam.countri.ui.add.AddCountryScreen
+import dev.sam.countri.ui.atlas.AtlasScreen
+import dev.sam.countri.ui.detail.CountryDetailScreen
+import dev.sam.countri.ui.passport.PassportScreen
 import dev.sam.countri.ui.theme.Countri
 import dev.sam.countri.ui.theme.CountriType
 import dev.sam.countri.ui.theme.Springs
+import dev.sam.countri.ui.wishlist.WishlistScreen
 
 @Composable
 fun CountriRoot(startAtOnboarding: Boolean = false) {
+    val viewModel: AtlasViewModel = viewModel(factory = AtlasViewModel.Factory)
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val destination = backStackEntry?.destination
@@ -61,6 +70,7 @@ fun CountriRoot(startAtOnboarding: Boolean = false) {
     ) { padding ->
         CountriNavHost(
             navController = navController,
+            viewModel = viewModel,
             startAtOnboarding = startAtOnboarding,
             modifier = Modifier
                 .fillMaxSize()
@@ -86,6 +96,7 @@ private fun NavHostController.navigateToTab(tab: CountriTab) {
 @Composable
 fun CountriNavHost(
     navController: NavHostController,
+    viewModel: AtlasViewModel,
     startAtOnboarding: Boolean,
     modifier: Modifier = Modifier,
 ) {
@@ -108,22 +119,46 @@ fun CountriNavHost(
         ) {
             PlaceholderScreen("Onboarding")
         }
-        composable<AtlasRoute> { PlaceholderScreen("Atlas") }
-        composable<PassportRoute> { PlaceholderScreen("Passport") }
+        composable<AtlasRoute> {
+            AtlasScreen(
+                viewModel = viewModel,
+                onCountryClick = { iso -> navController.navigate(DetailRoute(iso)) },
+                onSeePassport = { navController.navigateToTab(CountriTab.Passport) },
+            )
+        }
+        composable<PassportRoute> {
+            PassportScreen(
+                viewModel = viewModel,
+                onCountryClick = { iso -> navController.navigate(DetailRoute(iso)) },
+            )
+        }
         composable<StatsRoute> { PlaceholderScreen("Stats") }
-        composable<WishlistRoute> { PlaceholderScreen("Wishlist") }
+        composable<WishlistRoute> {
+            WishlistScreen(
+                viewModel = viewModel,
+                onCountryClick = { iso -> navController.navigate(DetailRoute(iso)) },
+            )
+        }
         composable<AddRoute>(
             enterTransition = { slideInVertically(Springs.SmoothOffset) { it } + fadeIn() },
             exitTransition = { fadeOut(tween(90)) },
             popExitTransition = { slideOutVertically(Springs.SmoothOffset) { it } + fadeOut() },
         ) {
-            PlaceholderScreen("Add")
+            AddCountryScreen(
+                viewModel = viewModel,
+                onClose = { navController.popBackStack() },
+            )
         }
         composable<DetailRoute>(
             enterTransition = { slideInHorizontally(Springs.SmoothOffset) { it / 3 } + fadeIn() },
             popExitTransition = { slideOutHorizontally(Springs.SmoothOffset) { it / 3 } + fadeOut() },
-        ) {
-            PlaceholderScreen("Detail")
+        ) { entry ->
+            val route = entry.toRoute<DetailRoute>()
+            CountryDetailScreen(
+                viewModel = viewModel,
+                iso2 = route.iso2,
+                onBack = { navController.popBackStack() },
+            )
         }
     }
 }
