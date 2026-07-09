@@ -26,6 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.unit.dp
+import dev.sam.countri.data.catalog.CountryCatalog
 import dev.sam.countri.domain.CountryWithState
 import dev.sam.countri.ui.AtlasViewModel
 import dev.sam.countri.ui.components.CodeBadge
@@ -33,6 +34,7 @@ import dev.sam.countri.ui.components.CountriIcons
 import dev.sam.countri.ui.components.LocalHaptics
 import dev.sam.countri.ui.components.SectionLabel
 import dev.sam.countri.ui.map.MapMode
+import dev.sam.countri.ui.map.WorldMap
 import dev.sam.countri.ui.theme.Countri
 import dev.sam.countri.ui.theme.CountriType
 import dev.sam.countri.ui.theme.hairline
@@ -92,7 +94,7 @@ fun AtlasScreen(
                 .fillMaxWidth()
                 .weight(1f)
         ) {
-            AtlasMap(viewModel)
+            AtlasMap(viewModel, onCountryClick)
 
             Column(
                 Modifier
@@ -183,14 +185,27 @@ fun AtlasScreen(
     }
 }
 
-/** Placeholder until the polygon renderer lands in M4. */
 @Composable
-private fun AtlasMap(viewModel: AtlasViewModel) {
-    val palette = Countri.palette
-    Box(
-        Modifier
-            .fillMaxSize()
-            .background(palette.canvas)
+private fun AtlasMap(
+    viewModel: AtlasViewModel,
+    onCountryClick: (String) -> Unit,
+) {
+    val countries by viewModel.countries.collectAsState()
+    val justAdded by viewModel.justAdded.collectAsState()
+    val statuses = remember(countries) {
+        buildMap {
+            countries.forEach { entry ->
+                entry.status?.let { put(CountryCatalog.indexOf(entry.country.iso2), it) }
+            }
+        }
+    }
+    WorldMap(
+        data = viewModel.worldMap,
+        statuses = statuses,
+        mode = viewModel.mapMode,
+        justAddedIso = justAdded,
+        onCountryTap = onCountryClick,
+        modifier = Modifier.fillMaxSize(),
     )
 }
 

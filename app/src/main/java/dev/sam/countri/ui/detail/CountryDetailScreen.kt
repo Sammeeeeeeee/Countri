@@ -37,6 +37,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.unit.dp
+import dev.sam.countri.data.catalog.CountryCatalog
 import dev.sam.countri.domain.CountryStatus
 import dev.sam.countri.domain.CountryWithState
 import dev.sam.countri.ui.AtlasViewModel
@@ -44,6 +45,9 @@ import dev.sam.countri.ui.components.CountriIcons
 import dev.sam.countri.ui.components.LocalHaptics
 import dev.sam.countri.ui.components.SectionLabel
 import dev.sam.countri.ui.components.StatusPill
+import dev.sam.countri.ui.map.MapMode
+import dev.sam.countri.ui.map.MapViewport
+import dev.sam.countri.ui.map.WorldMap
 import dev.sam.countri.ui.theme.Countri
 import dev.sam.countri.ui.theme.CountriType
 import dev.sam.countri.ui.theme.hairline
@@ -79,7 +83,7 @@ fun CountryDetailScreen(
                 .fillMaxWidth()
                 .height(270.dp)
         ) {
-            DetailHeroMap(entry)
+            DetailHeroMap(viewModel, entry)
             Box(
                 Modifier
                     .fillMaxSize()
@@ -301,15 +305,41 @@ fun CountryDetailScreen(
     }
 }
 
-/** Placeholder until the locator map lands in M4. */
+/** Zoomed locator: the country sits accented in its neighborhood. */
 @Composable
-private fun DetailHeroMap(entry: CountryWithState) {
-    val palette = Countri.palette
-    Box(
-        Modifier
-            .fillMaxSize()
-            .background(palette.globeShade)
+private fun DetailHeroMap(viewModel: AtlasViewModel, entry: CountryWithState) {
+    val countries by viewModel.countries.collectAsState()
+    val statuses = remember(countries) {
+        buildMap {
+            countries.forEach { e ->
+                e.status?.let { put(CountryCatalog.indexOf(e.country.iso2), it) }
+            }
+        }
+    }
+    WorldMap(
+        data = viewModel.worldMap,
+        statuses = statuses,
+        mode = MapMode.Flat,
+        viewport = MapViewport(
+            centerLon = entry.country.lon,
+            centerLat = entry.country.lat,
+            zoom = locatorZoom(entry.country.iso2),
+        ),
+        interactive = false,
+        autoRotate = false,
+        selectedIso = entry.country.iso2,
+        modifier = Modifier.fillMaxSize(),
     )
+}
+
+/** Small countries need a closer look; giants need the whole frame. */
+private fun locatorZoom(iso2: String): Float = when (iso2) {
+    "RU", "CA", "US", "CN", "BR", "AU" -> 1.6f
+    "IN", "AR", "KZ", "DZ", "CD", "SA", "MX", "ID", "GL" -> 2.6f
+    "MC", "SM", "VA", "LI", "AD", "MT", "SG", "BH", "MV", "AG", "BB", "DM",
+    "GD", "KN", "LC", "VC", "ST", "SC", "KM", "MU", "CV", "KI", "MH", "FM",
+    "NR", "PW", "WS", "TO", "TV" -> 14f
+    else -> 5f
 }
 
 @Composable
