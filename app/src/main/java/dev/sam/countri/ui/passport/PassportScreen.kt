@@ -2,11 +2,13 @@ package dev.sam.countri.ui.passport
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -16,21 +18,26 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
+import dev.sam.countri.ui.share.PassportShareSheet
 import dev.sam.countri.domain.CountryWithState
 import dev.sam.countri.ui.AtlasViewModel
 import dev.sam.countri.ui.components.CountriIcons
@@ -58,23 +65,55 @@ fun PassportScreen(
             .sortedWith(compareBy({ it.firstVisitYear ?: Int.MAX_VALUE }, { it.country.name }))
     }
 
+    var showShare by remember { mutableStateOf(false) }
+
     Column(
         Modifier
             .fillMaxSize()
             .statusBarsPadding()
     ) {
-        Column(Modifier.padding(horizontal = 22.dp).padding(top = 16.dp, bottom = 8.dp)) {
-            Text("Passport", style = CountriType.title, color = palette.textPrimary)
-            Text(
-                text = when (stamps.size) {
-                    0 -> "No stamps yet"
-                    1 -> "1 stamp"
-                    else -> "${stamps.size} stamps"
-                },
-                style = CountriType.bodySmall,
-                color = palette.textSecondary,
-                modifier = Modifier.padding(top = 5.dp),
-            )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 22.dp)
+                .padding(top = 16.dp, bottom = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.Top,
+        ) {
+            Column {
+                Text("Passport", style = CountriType.title, color = palette.textPrimary)
+                Text(
+                    text = when (stamps.size) {
+                        0 -> "No stamps yet"
+                        1 -> "1 stamp"
+                        else -> "${stamps.size} stamps"
+                    },
+                    style = CountriType.bodySmall,
+                    color = palette.textSecondary,
+                    modifier = Modifier.padding(top = 5.dp),
+                )
+            }
+            if (stamps.isNotEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .size(38.dp)
+                        .pressScale(0.9f)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(palette.surface1)
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                        ) { showShare = true },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        CountriIcons.Share,
+                        contentDescription = "Share passport",
+                        tint = palette.textSecondary,
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
+            }
         }
 
         if (stamps.isEmpty()) {
@@ -116,6 +155,13 @@ fun PassportScreen(
                 }
             }
         }
+    }
+
+    if (showShare) {
+        PassportShareSheet(
+            stamps = stamps,
+            onDismiss = { showShare = false },
+        )
     }
 }
 
