@@ -4,12 +4,12 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.Text
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import dev.sam.countri.ui.components.LocalHaptics
+import dev.sam.countri.ui.components.rememberHaptics
+import dev.sam.countri.ui.nav.CountriRoot
+import dev.sam.countri.ui.theme.CountriTheme
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -17,8 +17,10 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("Countri")
+            CountriTheme {
+                CompositionLocalProvider(LocalHaptics provides rememberHaptics()) {
+                    CountriRoot()
+                }
             }
         }
     }
