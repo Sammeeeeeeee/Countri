@@ -1,5 +1,6 @@
 package dev.sam.countri.ui.detail
 
+import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -33,21 +34,21 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import dev.sam.countri.data.catalog.CountryCatalog
+import androidx.core.net.toUri
+import dev.sam.countri.data.wiki.WikiSearch
 import dev.sam.countri.domain.CountryStatus
-import dev.sam.countri.domain.CountryWithState
 import dev.sam.countri.ui.AtlasViewModel
+import androidx.compose.ui.unit.sp
 import dev.sam.countri.ui.components.CountriIcons
 import dev.sam.countri.ui.components.LocalHaptics
 import dev.sam.countri.ui.components.SectionLabel
 import dev.sam.countri.ui.components.StatusPill
-import dev.sam.countri.ui.map.MapMode
-import dev.sam.countri.ui.map.MapViewport
-import dev.sam.countri.ui.map.WorldMap
+import dev.sam.countri.ui.components.flagEmoji
+import dev.sam.countri.ui.map.CityMarker
+import dev.sam.countri.ui.map.CountrySilhouette
 import dev.sam.countri.ui.theme.Countri
 import dev.sam.countri.ui.theme.CountriType
 import dev.sam.countri.ui.theme.hairline
@@ -62,13 +63,16 @@ fun CountryDetailScreen(
 ) {
     val palette = Countri.palette
     val haptics = LocalHaptics.current
+    val context = LocalContext.current
     val countries by viewModel.countries.collectAsState()
     val entry = countries.firstOrNull { it.country.iso2 == iso2 } ?: return
     var confirmClear by remember { mutableStateOf(false) }
     var editTarget by remember { mutableStateOf<EditTarget?>(null) }
+    var showAddVisit by remember { mutableStateOf(false) }
 
+    val continentHue = palette.continentColor(entry.country.continent)
     val accent = when (entry.status) {
-        CountryStatus.VISITED -> palette.visited
+        CountryStatus.VISITED -> continentHue
         CountryStatus.WISHLIST -> palette.wishlist
         null -> palette.textSecondary
     }
@@ -78,23 +82,26 @@ fun CountryDetailScreen(
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
     ) {
-        // ---- Hero: locator map (M4) under a scrim, name + code on top ----
+        // ---- Hero: the country itself, drawn huge ----
         Box(
             Modifier
                 .fillMaxWidth()
-                .height(270.dp)
+                .height(300.dp)
         ) {
-            DetailHeroMap(viewModel, entry)
-            Box(
-                Modifier
+            val markers = remember(entry.visits) {
+                entry.allCities.mapNotNull { name ->
+                    viewModel.cities.find(iso2, name)?.let { city ->
+                        CityMarker(city.name, city.lat, city.lon)
+                    }
+                }
+            }
+            CountrySilhouette(
+                data = viewModel.worldMap,
+                iso2 = iso2,
+                cityMarkers = markers,
+                modifier = Modifier
                     .fillMaxSize()
-                    .background(
-                        Brush.verticalGradient(
-                            0f to palette.canvas.copy(alpha = 0.35f),
-                            0.45f to Color.Transparent,
-                            1f to palette.canvas,
-                        )
-                    )
+                    .padding(horizontal = 26.dp, vertical = 14.dp),
             )
             Box(
                 modifier = Modifier
@@ -103,7 +110,7 @@ fun CountryDetailScreen(
                     .size(38.dp)
                     .pressScale(0.9f)
                     .clip(RoundedCornerShape(12.dp))
-                    .background(palette.canvas.copy(alpha = 0.55f))
+                    .background(palette.surface1.copy(alpha = 0.85f))
                     .hairline(RoundedCornerShape(12.dp))
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
@@ -118,148 +125,171 @@ fun CountryDetailScreen(
                     modifier = Modifier.size(20.dp),
                 )
             }
-            Column(
-                Modifier
-                    .align(Alignment.BottomStart)
-                    .fillMaxWidth()
-                    .padding(horizontal = 22.dp, vertical = 4.dp)
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    StatusPill(
-                        text = when (entry.status) {
-                            CountryStatus.VISITED -> "Visited"
-                            CountryStatus.WISHLIST -> "On the wishlist"
-                            null -> "Not yet"
-                        },
-                        accent = accent,
-                    )
-                    Text(
-                        entry.country.continent.displayName,
-                        style = CountriType.bodySmall,
-                        color = palette.textSecondary,
-                    )
-                }
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.Bottom,
-                ) {
-                    Text(
-                        entry.country.name,
-                        style = CountriType.display,
-                        color = palette.textPrimary,
-                        modifier = Modifier.weight(1f, fill = false),
-                    )
-                    Text(
-                        entry.country.iso2,
-                        style = CountriType.subtitle.copy(fontFamily = dev.sam.countri.ui.theme.MonoFamily),
-                        color = accent.copy(alpha = 0.7f),
-                        modifier = Modifier.padding(start = 12.dp, bottom = 4.dp),
-                    )
-                }
-            }
         }
 
-        // ---- Body ----
+        // ---- Identity ----
         Column(Modifier.padding(horizontal = 22.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                StatusPill(
+                    text = when (entry.status) {
+                        CountryStatus.VISITED -> "Visited"
+                        CountryStatus.WISHLIST -> "On the wishlist"
+                        null -> "Not yet"
+                    },
+                    accent = accent,
+                )
+                Text(
+                    entry.country.continent.displayName,
+                    style = CountriType.bodySmall,
+                    color = continentHue.copy(alpha = 0.8f),
+                )
+            }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 10.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Bottom,
+            ) {
+                Text(
+                    entry.country.name,
+                    style = CountriType.display,
+                    color = palette.textPrimary,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+                Text(
+                    flagEmoji(entry.country.iso2),
+                    style = CountriType.body.copy(fontSize = 30.sp),
+                    modifier = Modifier.padding(start = 12.dp, bottom = 4.dp),
+                )
+            }
+
+            // ---- Visits ----
             if (entry.isVisited) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 14.dp),
+                        .padding(top = 18.dp),
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
-                    StatCard("First visit", entry.firstVisitYear?.toString() ?: "—", Modifier.weight(1f)) {
-                        editTarget = EditTarget.YearOfVisit
+                    StatCard(
+                        label = "First visit",
+                        value = entry.firstYear?.toString() ?: "—",
+                        accent = continentHue,
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        if (entry.visits.isEmpty()) editTarget = EditTarget.YearOfVisit
                     }
-                    StatCard("Trips", entry.trips.toString(), Modifier.weight(1f)) {
-                        editTarget = EditTarget.Trips
-                    }
-                    StatCard("Cities", entry.cities.size.toString(), Modifier.weight(1f)) {
-                        editTarget = EditTarget.Cities
-                    }
+                    StatCard(
+                        label = if (entry.tripCount == 1) "Trip" else "Trips",
+                        value = entry.tripCount.toString(),
+                        accent = continentHue,
+                        modifier = Modifier.weight(1f),
+                    ) { showAddVisit = true }
                 }
-                Text(
-                    text = if (entry.note.isNullOrBlank()) "Add a line to remember it by…"
-                    else "“${entry.note}”",
-                    style = CountriType.subtitle.copy(fontStyle = FontStyle.Italic),
-                    color = if (entry.note.isNullOrBlank()) palette.textFaint
-                    else palette.textPrimary.copy(alpha = 0.82f),
-                    modifier = Modifier
-                        .padding(top = 22.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null,
-                        ) { editTarget = EditTarget.Note },
-                )
-                SectionLabel("Cities", Modifier.padding(top = 26.dp, bottom = 12.dp))
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(9.dp),
-                    verticalArrangement = Arrangement.spacedBy(9.dp),
-                ) {
-                    entry.cities.forEach { city ->
-                        Text(
-                            city,
-                            style = CountriType.bodySmall,
-                            color = palette.textPrimary,
-                            modifier = Modifier
-                                .clip(CircleShape)
-                                .background(palette.surface1)
-                                .hairline(CircleShape)
-                                .padding(horizontal = 15.dp, vertical = 8.dp),
-                        )
+                if (entry.visits.isNotEmpty()) {
+                    SectionLabel("Visits", Modifier.padding(top = 24.dp, bottom = 10.dp))
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        entry.visits.sortedByDescending { it.start }.forEach { visit ->
+                            VisitCard(
+                                visit = visit,
+                                accent = continentHue,
+                                onDelete = {
+                                    haptics.reject()
+                                    viewModel.deleteVisit(visit.id)
+                                },
+                            )
+                        }
                     }
-                    Text(
-                        "+ Add",
-                        style = CountriType.bodySmall,
-                        color = palette.visited,
-                        modifier = Modifier
-                            .pressScale(0.94f)
-                            .clip(CircleShape)
-                            .hairline(CircleShape, palette.visited.copy(alpha = 0.3f))
-                            .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null,
-                            ) { editTarget = EditTarget.Cities }
-                            .padding(horizontal = 15.dp, vertical = 8.dp),
-                    )
                 }
             } else if (entry.isWishlist) {
                 Text(
                     "Still on the list.",
-                    style = CountriType.subtitle.copy(fontStyle = FontStyle.Italic),
+                    style = CountriType.quote,
                     color = palette.textPrimary.copy(alpha = 0.8f),
-                    modifier = Modifier.padding(top = 22.dp),
+                    modifier = Modifier.padding(top = 18.dp),
                 )
+            }
+
+            // ---- Places: things seen or worth seeing; tap one → Wikipedia ----
+            if (entry.status != null) {
+                SectionLabel(
+                    if (entry.isVisited) "Places" else "Places to see",
+                    Modifier.padding(top = 26.dp, bottom = 12.dp),
+                )
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(9.dp),
+                    verticalArrangement = Arrangement.spacedBy(9.dp),
+                ) {
+                    entry.places.forEach { place ->
+                        Row(
+                            modifier = Modifier
+                                .pressScale(0.96f)
+                                .clip(CircleShape)
+                                .background(palette.surface1)
+                                .hairline(CircleShape, continentHue.copy(alpha = 0.25f))
+                                .clickable(
+                                    interactionSource = remember { MutableInteractionSource() },
+                                    indication = null,
+                                ) {
+                                    haptics.tick()
+                                    context.startActivity(
+                                        Intent(Intent.ACTION_VIEW, WikiSearch.pageUrl(place).toUri())
+                                    )
+                                }
+                                .padding(horizontal = 14.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(place, style = CountriType.bodySmall, color = palette.textPrimary)
+                            Icon(
+                                CountriIcons.Chevron,
+                                contentDescription = null,
+                                tint = continentHue.copy(alpha = 0.7f),
+                                modifier = Modifier
+                                    .padding(start = 4.dp)
+                                    .size(12.dp),
+                            )
+                        }
+                    }
+                    Text(
+                        "+ Add",
+                        style = CountriType.bodySmall,
+                        color = continentHue,
+                        modifier = Modifier
+                            .pressScale(0.94f)
+                            .clip(CircleShape)
+                            .hairline(CircleShape, continentHue.copy(alpha = 0.35f))
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null,
+                            ) { editTarget = EditTarget.Places }
+                            .padding(horizontal = 15.dp, vertical = 8.dp),
+                    )
+                }
             }
 
             // ---- Actions ----
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 26.dp, bottom = 26.dp),
+                    .padding(top = 28.dp, bottom = 26.dp),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 ActionButton(
-                    text = "Visited",
-                    accent = palette.visited,
-                    dim = palette.visitedDim,
+                    text = if (entry.isVisited) "+ Add visit" else "Visited",
+                    accent = continentHue,
                     selected = entry.isVisited,
                     modifier = Modifier.weight(1f),
                 ) {
-                    haptics.confirm()
-                    viewModel.setStatus(iso2, CountryStatus.VISITED)
+                    haptics.tick()
+                    showAddVisit = true
                 }
                 ActionButton(
                     text = "Wishlist",
                     accent = palette.wishlist,
-                    dim = palette.wishlistDim,
                     selected = entry.isWishlist,
                     modifier = Modifier.weight(1f),
                 ) {
@@ -271,13 +301,13 @@ fun CountryDetailScreen(
                         modifier = Modifier
                             .size(width = 52.dp, height = 50.dp)
                             .pressScale(0.94f)
-                            .clip(RoundedCornerShape(14.dp))
-                            .hairline(RoundedCornerShape(14.dp))
+                            .clip(CircleShape)
+                            .hairline(CircleShape)
                             .clickable(
                                 interactionSource = remember { MutableInteractionSource() },
                                 indication = null,
                             ) {
-                                val hasData = entry.note != null || entry.cities.isNotEmpty() ||
+                                val hasData = entry.places.isNotEmpty() ||
                                     (entry.isVisited && entry.trips > 1)
                                 if (hasData) confirmClear = true else {
                                     haptics.reject()
@@ -299,6 +329,18 @@ fun CountryDetailScreen(
         }
     }
 
+    if (showAddVisit) {
+        AddVisitSheet(
+            entry = entry,
+            cityData = viewModel.cities,
+            onDismiss = { showAddVisit = false },
+            onSave = { start, end, visitCities ->
+                viewModel.addVisit(iso2, start, end, visitCities)
+                showAddVisit = false
+            },
+        )
+    }
+
     editTarget?.let { target ->
         DetailEditSheet(
             target = target,
@@ -313,14 +355,9 @@ fun CountryDetailScreen(
                 viewModel.updateDetails(iso2, trips = trips)
                 editTarget = null
             },
-            onSaveNote = { note ->
+            onSavePlaces = { places ->
                 haptics.confirm()
-                viewModel.updateDetails(iso2, note = note)
-                editTarget = null
-            },
-            onSaveCities = { cities ->
-                haptics.confirm()
-                viewModel.updateDetails(iso2, cities = cities)
+                viewModel.updateDetails(iso2, places = places)
                 editTarget = null
             },
         )
@@ -335,7 +372,7 @@ fun CountryDetailScreen(
             title = { Text("Remove ${entry.country.name}?", style = CountriType.subtitle) },
             text = {
                 Text(
-                    "Your year, note and cities for this country will be deleted.",
+                    "Your visits and places for this country will be deleted.",
                     style = CountriType.body,
                 )
             },
@@ -345,59 +382,82 @@ fun CountryDetailScreen(
                     haptics.reject()
                     viewModel.clear(iso2)
                 }) {
-                    Text("Remove", style = CountriType.body, color = palette.wishlist)
+                    Text("Remove", style = CountriType.body, color = palette.textSecondary)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { confirmClear = false }) {
-                    Text("Keep", style = CountriType.body, color = palette.textSecondary)
+                    Text("Keep", style = CountriType.body, color = continentHue)
                 }
             },
         )
     }
 }
 
-/** Zoomed locator: the country sits accented in its neighborhood. */
 @Composable
-private fun DetailHeroMap(viewModel: AtlasViewModel, entry: CountryWithState) {
-    val countries by viewModel.countries.collectAsState()
-    val statuses = remember(countries) {
-        buildMap {
-            countries.forEach { e ->
-                e.status?.let { put(CountryCatalog.indexOf(e.country.iso2), it) }
+private fun VisitCard(
+    visit: dev.sam.countri.domain.Visit,
+    accent: Color,
+    onDelete: () -> Unit,
+) {
+    val palette = Countri.palette
+    val formatter = remember { java.time.format.DateTimeFormatter.ofPattern("d MMM yyyy") }
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(20.dp))
+            .background(palette.surface1)
+            .hairline(RoundedCornerShape(20.dp))
+            .padding(14.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    "${visit.start.format(formatter)} → ${visit.end.format(formatter)}",
+                    style = CountriType.bodySmall,
+                    color = palette.textPrimary,
+                )
+                Text(
+                    if (visit.days == 1) "1 day" else "${visit.days} days",
+                    style = CountriType.monoSmall,
+                    color = accent,
+                    modifier = Modifier.padding(top = 3.dp),
+                )
             }
+            Icon(
+                CountriIcons.Close,
+                contentDescription = "Delete visit",
+                tint = palette.textFaint,
+                modifier = Modifier
+                    .size(24.dp)
+                    .clip(CircleShape)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = onDelete,
+                    )
+                    .padding(5.dp),
+            )
+        }
+        if (visit.cities.isNotEmpty()) {
+            Text(
+                visit.cities.joinToString(" · "),
+                style = CountriType.bodySmall,
+                color = palette.textSecondary,
+                modifier = Modifier.padding(top = 6.dp),
+            )
         }
     }
-    WorldMap(
-        data = viewModel.worldMap,
-        statuses = statuses,
-        mode = MapMode.Flat,
-        viewport = MapViewport(
-            centerLon = entry.country.lon,
-            centerLat = entry.country.lat,
-            zoom = locatorZoom(entry.country.iso2),
-        ),
-        interactive = false,
-        autoRotate = false,
-        selectedIso = entry.country.iso2,
-        modifier = Modifier.fillMaxSize(),
-    )
-}
-
-/** Small countries need a closer look; giants need the whole frame. */
-private fun locatorZoom(iso2: String): Float = when (iso2) {
-    "RU", "CA", "US", "CN", "BR", "AU" -> 1.6f
-    "IN", "AR", "KZ", "DZ", "CD", "SA", "MX", "ID", "GL" -> 2.6f
-    "MC", "SM", "VA", "LI", "AD", "MT", "SG", "BH", "MV", "AG", "BB", "DM",
-    "GD", "KN", "LC", "VC", "ST", "SC", "KM", "MU", "CV", "KI", "MH", "FM",
-    "NR", "PW", "WS", "TO", "TV" -> 14f
-    else -> 5f
 }
 
 @Composable
 private fun StatCard(
     label: String,
     value: String,
+    accent: Color,
     modifier: Modifier = Modifier,
     onClick: () -> Unit = {},
 ) {
@@ -405,9 +465,9 @@ private fun StatCard(
     Column(
         modifier = modifier
             .pressScale(0.97f)
-            .clip(RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(20.dp))
             .background(palette.surface1)
-            .hairline(RoundedCornerShape(16.dp))
+            .hairline(RoundedCornerShape(20.dp))
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
@@ -417,8 +477,8 @@ private fun StatCard(
     ) {
         Text(
             value,
-            style = CountriType.displaySmall.copy(fontSize = CountriType.title.fontSize),
-            color = palette.visited,
+            style = CountriType.title,
+            color = accent,
         )
         Text(
             label,
@@ -433,7 +493,6 @@ private fun StatCard(
 private fun ActionButton(
     text: String,
     accent: Color,
-    dim: Color,
     selected: Boolean,
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
@@ -442,9 +501,9 @@ private fun ActionButton(
         modifier = modifier
             .height(50.dp)
             .pressScale(0.96f)
-            .clip(RoundedCornerShape(14.dp))
-            .background(if (selected) dim else Color.Transparent)
-            .hairline(RoundedCornerShape(14.dp), accent.copy(alpha = if (selected) 0.4f else 0.2f))
+            .clip(CircleShape)
+            .background(if (selected) accent.copy(alpha = 0.16f) else Color.Transparent)
+            .hairline(CircleShape, accent.copy(alpha = if (selected) 0.5f else 0.25f))
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,

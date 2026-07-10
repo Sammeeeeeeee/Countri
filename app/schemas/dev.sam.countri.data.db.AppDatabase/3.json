@@ -1,0 +1,112 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 3,
+    "identityHash": "f424fec4562d02f6868655cd286693ec",
+    "entities": [
+      {
+        "tableName": "country_state",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`iso2` TEXT NOT NULL, `status` TEXT NOT NULL, `firstVisitYear` INTEGER, `note` TEXT, `tags` TEXT NOT NULL, `trips` INTEGER NOT NULL, PRIMARY KEY(`iso2`))",
+        "fields": [
+          {
+            "fieldPath": "iso2",
+            "columnName": "iso2",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "status",
+            "columnName": "status",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "firstVisitYear",
+            "columnName": "firstVisitYear",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "note",
+            "columnName": "note",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "tags",
+            "columnName": "tags",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "trips",
+            "columnName": "trips",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "iso2"
+          ]
+        }
+      },
+      {
+        "tableName": "visit",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `iso2` TEXT NOT NULL, `startDay` INTEGER NOT NULL, `endDay` INTEGER NOT NULL, `cities` TEXT NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "iso2",
+            "columnName": "iso2",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "startDay",
+            "columnName": "startDay",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "endDay",
+            "columnName": "endDay",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "cities",
+            "columnName": "cities",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_visit_iso2",
+            "unique": false,
+            "columnNames": [
+              "iso2"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_visit_iso2` ON `${TABLE_NAME}` (`iso2`)"
+          }
+        ]
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'f424fec4562d02f6868655cd286693ec')"
+    ]
+  }
+}

@@ -1,4 +1,4 @@
-package dev.sam.countri.ui.share
+﻿package dev.sam.countri.ui.share
 
 import android.content.Context
 import android.graphics.Bitmap
@@ -10,38 +10,46 @@ import android.graphics.Typeface
 import androidx.core.content.res.ResourcesCompat
 import dev.sam.countri.R
 import dev.sam.countri.domain.CountryWithState
+import dev.sam.countri.ui.components.flagEmoji
 import dev.sam.countri.ui.passport.stampRotation
 import kotlin.math.ceil
 import kotlin.math.min
 
-/** The three looks a shared passport card can wear. */
+/**
+ * The three looks a shared passport card can wear. [accents] is one ink per
+ * continent (catalog Continent ordinal order) — each stamp wears its own.
+ */
 enum class ShareStyle(
     val displayName: String,
     val background: Int,
     val ink: Int,
     val accent: Int,
     val faint: Int,
+    val accents: IntArray,
 ) {
-    Midnight(
-        displayName = "Midnight",
-        background = 0xFF0C110F.toInt(),
-        ink = 0xFFE9EFE8.toInt(),
-        accent = 0xFFCEF79E.toInt(),
-        faint = 0x61E9EFE8,
+    Light(
+        displayName = "Light",
+        background = 0xFFFFFFFF.toInt(),
+        ink = 0xFF1F1F1F.toInt(),
+        accent = 0xFF1F1F1F.toInt(),
+        faint = 0xFF717173.toInt(),
+        accents = IntArray(6) { 0xFF1F1F1F.toInt() },
     ),
-    Paper(
-        displayName = "Paper",
-        background = 0xFFF7F7F5.toInt(),
-        ink = 0xFF1A211E.toInt(),
-        accent = 0xFF4C7A1F.toInt(),
-        faint = 0x611A211E,
+    Dark(
+        displayName = "Dark",
+        background = 0xFF1F1F1F.toInt(),
+        ink = 0xFFFFFFFF.toInt(),
+        accent = 0xFFFFFFFF.toInt(),
+        faint = 0xFF9A9A9E.toInt(),
+        accents = IntArray(6) { 0xFFFFFFFF.toInt() },
     ),
-    Stampbook(
-        displayName = "Stamp book",
-        background = 0xFFEFE6D4.toInt(),
-        ink = 0xFF3A3128.toInt(),
-        accent = 0xFF9C4A32.toInt(),
-        faint = 0x663A3128,
+    Mist(
+        displayName = "Mist",
+        background = 0xFFF7F7F7.toInt(),
+        ink = 0xFF1F1F1F.toInt(),
+        accent = 0xFF4C4C4C.toInt(),
+        faint = 0xFF717173.toInt(),
+        accents = IntArray(6) { 0xFF4C4C4C.toInt() },
     ),
 }
 
@@ -59,8 +67,8 @@ object PassportCardRenderer {
     fun render(context: Context, stamps: List<CountryWithState>, style: ShareStyle): Bitmap {
         val bitmap = Bitmap.createBitmap(WIDTH, HEIGHT, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
-        val display = ResourcesCompat.getFont(context, R.font.inter_tight) ?: Typeface.DEFAULT
-        val mono = ResourcesCompat.getFont(context, R.font.jetbrains_mono) ?: Typeface.MONOSPACE
+        val display = ResourcesCompat.getFont(context, R.font.inter) ?: Typeface.DEFAULT
+        val mono = ResourcesCompat.getFont(context, R.font.inter) ?: Typeface.DEFAULT
 
         canvas.drawColor(style.background)
 
@@ -77,7 +85,7 @@ object PassportCardRenderer {
         paint.textSize = 96f
         paint.letterSpacing = -0.02f
         paint.color = style.ink
-        val years = stamps.mapNotNull { it.firstVisitYear }
+        val years = stamps.mapNotNull { it.firstYear }
         val title = when (stamps.size) {
             1 -> "1 country"
             else -> "${stamps.size} countries"
@@ -132,11 +140,12 @@ object PassportCardRenderer {
         mono: Typeface,
     ) {
         val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+        val ink = style.accents[entry.country.continent.ordinal]
         canvas.save()
         canvas.rotate(stampRotation(entry.country.iso2), cx, cy)
 
         paint.style = Paint.Style.STROKE
-        paint.color = style.accent
+        paint.color = ink
         paint.alpha = 135
         paint.strokeWidth = 3.6f
         canvas.drawCircle(cx, cy, radius, paint)
@@ -148,18 +157,19 @@ object PassportCardRenderer {
         paint.pathEffect = null
 
         paint.style = Paint.Style.FILL
-        paint.typeface = mono
+        paint.typeface = Typeface.DEFAULT // emoji flags come from the system font
         paint.textAlign = Paint.Align.CENTER
-        paint.textSize = radius * 0.52f
+        paint.textSize = radius * 0.56f
+        paint.color = ink
+        canvas.drawText(flagEmoji(entry.country.iso2), cx, cy + radius * 0.16f, paint)
+        paint.typeface = mono
         paint.letterSpacing = 0.04f
-        paint.color = style.accent
-        canvas.drawText(entry.country.iso2, cx, cy + radius * 0.12f, paint)
 
         paint.textSize = radius * 0.2f
         paint.letterSpacing = 0.1f
         paint.alpha = 190
         canvas.drawText(
-            entry.firstVisitYear?.toString() ?: "·",
+            entry.firstYear?.toString() ?: "·",
             cx,
             cy + radius * 0.46f,
             paint,

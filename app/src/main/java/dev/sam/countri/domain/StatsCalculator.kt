@@ -11,14 +11,21 @@ data class ContinentStat(
     val fraction: Float get() = visited.toFloat() / continent.total
 }
 
-data class YearGroup(val year: Int, val isoCodes: List<String>)
+/** One country's contribution to a year: which cities, how many days. */
+data class TimelineEntry(val iso2: String, val cities: List<String>, val days: Int)
+
+data class YearGroup(val year: Int, val entries: List<TimelineEntry>) {
+    val isoCodes: List<String> get() = entries.map { it.iso2 }.distinct().sorted()
+    val cities: List<String> get() = entries.flatMap { it.cities }.distinct()
+    val totalDays: Int get() = entries.sumOf { it.days }
+}
 
 data class AtlasStats(
     val visitedCount: Int,
     val wishlistCount: Int,
     val percentOfWorld: Int,
     val continentsVisited: Int,
-    val cityTotal: Int,
+    val placeTotal: Int,
     val byContinent: List<ContinentStat>,
     val timeline: List<YearGroup>,
 )
@@ -30,16 +37,37 @@ object StatsCalculator {
         val byContinent = Continent.entries
             .map { cont -> ContinentStat(cont, visited.count { it.country.continent == cont }) }
             .sortedWith(compareByDescending<ContinentStat> { it.visited }.thenBy { it.continent.ordinal })
+        // Visits carry the real story (cities, days); countries marked
+        // visited before visits existed fall back to their legacy year.
         val timeline = visited
-            .groupBy { it.firstVisitYear ?: fallbackYear }
-            .map { (year, group) -> YearGroup(year, group.map { it.country.iso2 }.sorted()) }
+            .flatMap { entry ->
+                if (entry.visits.isNotEmpty()) {
+                    entry.visits.map { visit ->
+                        visit.start.year to TimelineEntry(
+                            iso2 = entry.country.iso2,
+                            cities = visit.cities,
+                            days = visit.days,
+                        )
+                    }
+                } else {
+                    listOf(
+                        (entry.firstVisitYear ?: fallbackYear) to TimelineEntry(
+                            iso2 = entry.country.iso2,
+                            cities = emptyList(),
+                            days = 0,
+                        )
+                    )
+                }
+            }
+            .groupBy({ it.first }, { it.second })
+            .map { (year, entries) -> YearGroup(year, entries.sortedBy { it.iso2 }) }
             .sortedBy { it.year }
         return AtlasStats(
             visitedCount = visited.size,
             wishlistCount = countries.count { it.isWishlist },
             percentOfWorld = (visited.size * 100f / WORLD_COUNTRY_COUNT).roundToInt(),
             continentsVisited = visited.map { it.country.continent }.toSet().size,
-            cityTotal = visited.sumOf { it.cities.size },
+            placeTotal = countries.sumOf { it.places.size },
             byContinent = byContinent,
             timeline = timeline,
         )

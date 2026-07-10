@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -60,7 +61,7 @@ fun PassportShareSheet(
     val palette = Countri.palette
     val haptics = LocalHaptics.current
     val context = LocalContext.current
-    var selected by remember { mutableStateOf(if (palette.isDark) ShareStyle.Midnight else ShareStyle.Paper) }
+    var selected by remember { mutableStateOf(if (palette.isDark) ShareStyle.Dark else ShareStyle.Light) }
     var previews by remember { mutableStateOf<Map<ShareStyle, ImageBitmap>>(emptyMap()) }
 
     LaunchedEffect(stamps) {
@@ -76,7 +77,7 @@ fun PassportShareSheet(
         onDismissRequest = onDismiss,
         containerColor = palette.surface2,
         contentWindowInsets = { WindowInsets(0) },
-        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+        shape = RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp),
     ) {
         Column(
             Modifier
@@ -154,7 +155,7 @@ fun PassportShareSheet(
                     .fillMaxWidth()
                     .height(56.dp)
                     .pressScale(0.97f)
-                    .clip(RoundedCornerShape(16.dp))
+                    .clip(CircleShape)
                     .background(palette.visited)
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },

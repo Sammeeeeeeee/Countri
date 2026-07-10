@@ -5,9 +5,9 @@ import kotlinx.serialization.json.Json
 
 class Converters {
     @TypeConverter
-    fun fromCities(cities: List<String>): String = Json.encodeToString(cities)
+    fun fromTags(tags: List<String>): String = Json.encodeToString(tags)
 
     @TypeConverter
-    fun toCities(json: String): List<String> =
+    fun toTags(json: String): List<String> =
         if (json.isBlank()) emptyList() else Json.decodeFromString(json)
 }

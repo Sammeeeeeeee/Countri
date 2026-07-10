@@ -10,6 +10,7 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import dev.sam.countri.CountriApp
 import dev.sam.countri.data.catalog.CountryCatalog
+import dev.sam.countri.data.cities.CityData
 import dev.sam.countri.data.map.WorldMapData
 import dev.sam.countri.data.prefs.OnboardingPrefs
 import dev.sam.countri.data.repo.AtlasRepository
@@ -27,6 +28,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import java.time.LocalDate
 import java.time.Year
 
 /**
@@ -37,6 +39,7 @@ class AtlasViewModel(
     private val repository: AtlasRepository,
     private val onboardingPrefs: OnboardingPrefs,
     val worldMap: WorldMapData,
+    val cities: CityData,
 ) : ViewModel() {
 
     private val emptyAtlas = CountryCatalog.all.map { CountryWithState(it) }
@@ -57,6 +60,9 @@ class AtlasViewModel(
     /** Atlas map view state survives tab hops. */
     var mapMode by mutableStateOf(MapMode.Flat)
 
+    /** The globe-unwrap opening plays once per process. */
+    var introPlayed: Boolean = false
+
     /** Country that just became visited — the map plays a pulse on it. */
     val justAdded: StateFlow<String?> get() = _justAdded
     private val _justAdded = MutableStateFlow<String?>(null)
@@ -73,11 +79,24 @@ class AtlasViewModel(
         }
     }
 
+    /** Records a trip; the country becomes visited if it wasn't already. */
+    fun addVisit(iso2: String, start: LocalDate, end: LocalDate, visitCities: List<String>) {
+        val existing = byIso(iso2)
+        viewModelScope.launch {
+            repository.addVisit(iso2, start, end, visitCities, existing)
+            pulse(iso2)
+        }
+    }
+
+    fun deleteVisit(id: Long) {
+        viewModelScope.launch { repository.deleteVisit(id) }
+    }
+
     fun updateDetails(
         iso2: String,
         firstVisitYear: Int? = null,
         note: String? = null,
-        cities: List<String>? = null,
+        places: List<String>? = null,
         trips: Int? = null,
     ) {
         val current = byIso(iso2) ?: return
@@ -86,7 +105,7 @@ class AtlasViewModel(
                 current = current,
                 firstVisitYear = firstVisitYear ?: current.firstVisitYear,
                 note = note ?: current.note,
-                cities = cities ?: current.cities,
+                places = places ?: current.places,
                 trips = trips ?: current.trips,
             )
         }
@@ -117,6 +136,7 @@ class AtlasViewModel(
                     repository = app.container.repository,
                     onboardingPrefs = app.container.onboardingPrefs,
                     worldMap = app.container.worldMap,
+                    cities = app.container.cities,
                 )
             }
         }

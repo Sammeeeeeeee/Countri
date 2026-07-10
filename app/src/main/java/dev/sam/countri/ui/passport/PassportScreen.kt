@@ -1,4 +1,4 @@
-package dev.sam.countri.ui.passport
+﻿package dev.sam.countri.ui.passport
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.Canvas
@@ -42,6 +42,7 @@ import dev.sam.countri.domain.CountryWithState
 import dev.sam.countri.ui.AtlasViewModel
 import dev.sam.countri.ui.components.CountriIcons
 import dev.sam.countri.ui.components.LocalHaptics
+import dev.sam.countri.ui.components.flagEmoji
 import dev.sam.countri.ui.theme.Countri
 import dev.sam.countri.ui.theme.CountriType
 import dev.sam.countri.ui.theme.Springs
@@ -62,7 +63,7 @@ fun PassportScreen(
     val countries by viewModel.countries.collectAsState()
     val stamps = remember(countries) {
         countries.filter { it.isVisited }
-            .sortedWith(compareBy({ it.firstVisitYear ?: Int.MAX_VALUE }, { it.country.name }))
+            .sortedWith(compareBy({ it.firstYear ?: Int.MAX_VALUE }, { it.country.name }))
     }
 
     var showShare by remember { mutableStateOf(false) }
@@ -173,7 +174,7 @@ private fun Stamp(
 ) {
     val palette = Countri.palette
     val haptics = LocalHaptics.current
-    val accent = palette.visited
+    val accent = palette.continentColor(entry.country.continent)
 
     // Stamp hit: starts big and transparent, slams down with overshoot.
     val scale = remember(entry.country.iso2) { Animatable(2.3f) }
@@ -222,12 +223,11 @@ private fun Stamp(
         }
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
-                entry.country.iso2,
-                style = CountriType.mono.copy(fontSize = 24.sp, letterSpacing = 0.04.em),
-                color = accent,
+                flagEmoji(entry.country.iso2),
+                style = CountriType.body.copy(fontSize = 30.sp),
             )
             Text(
-                entry.firstVisitYear?.toString() ?: "—",
+                entry.firstYear?.toString() ?: "—",
                 style = CountriType.monoSmall,
                 color = accent.copy(alpha = 0.75f),
                 modifier = Modifier.padding(top = 3.dp),

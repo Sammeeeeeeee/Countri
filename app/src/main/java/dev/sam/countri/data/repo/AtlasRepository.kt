@@ -3,32 +3,50 @@ package dev.sam.countri.data.repo
 import dev.sam.countri.data.catalog.CountryCatalog
 import dev.sam.countri.data.db.CountryStateDao
 import dev.sam.countri.data.db.CountryStateEntity
+import dev.sam.countri.data.db.VisitDao
+import dev.sam.countri.data.db.VisitEntity
 import dev.sam.countri.domain.CountryStatus
 import dev.sam.countri.domain.CountryWithState
+import dev.sam.countri.domain.Visit
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.map
-import java.time.Year
+import kotlinx.coroutines.flow.combine
+import java.time.LocalDate
 
 /**
  * The single source every screen derives from: the static 195-country
- * catalog joined with the user's Room rows.
+ * catalog joined with the user's country rows and visit records.
  */
-class AtlasRepository(private val dao: CountryStateDao) {
+class AtlasRepository(
+    private val dao: CountryStateDao,
+    private val visitDao: VisitDao,
+) {
 
-    val countries: Flow<List<CountryWithState>> = dao.observeAll().map { rows ->
-        val byIso = rows.associateBy { it.iso2 }
-        CountryCatalog.all.map { country ->
-            val row = byIso[country.iso2]
-            CountryWithState(
-                country = country,
-                status = row?.status?.let { runCatching { CountryStatus.valueOf(it) }.getOrNull() },
-                firstVisitYear = row?.firstVisitYear,
-                note = row?.note,
-                cities = row?.cities ?: emptyList(),
-                trips = row?.trips ?: 0,
-            )
+    val countries: Flow<List<CountryWithState>> =
+        combine(dao.observeAll(), visitDao.observeAll()) { rows, visitRows ->
+            val byIso = rows.associateBy { it.iso2 }
+            val visitsByIso = visitRows.groupBy { it.iso2 }
+            CountryCatalog.all.map { country ->
+                val row = byIso[country.iso2]
+                CountryWithState(
+                    country = country,
+                    status = row?.status?.let {
+                        runCatching { CountryStatus.valueOf(it) }.getOrNull()
+                    },
+                    firstVisitYear = row?.firstVisitYear,
+                    note = row?.note,
+                    places = row?.tags ?: emptyList(),
+                    trips = row?.trips ?: 0,
+                    visits = (visitsByIso[country.iso2] ?: emptyList()).map { v ->
+                        Visit(
+                            id = v.id,
+                            start = LocalDate.ofEpochDay(v.startDay),
+                            end = LocalDate.ofEpochDay(v.endDay),
+                            cities = v.cities,
+                        )
+                    },
+                )
+            }
         }
-    }
 
     /** Sets or changes status, preserving details when a row already exists. */
     suspend fun setStatus(iso2: String, status: CountryStatus, existing: CountryWithState?) {
@@ -36,25 +54,42 @@ class AtlasRepository(private val dao: CountryStateDao) {
             CountryStateEntity(
                 iso2 = iso2,
                 status = status.name,
-                firstVisitYear = when (status) {
-                    CountryStatus.VISITED -> existing?.firstVisitYear ?: Year.now().value
-                    CountryStatus.WISHLIST -> existing?.firstVisitYear
-                },
+                firstVisitYear = existing?.firstVisitYear,
                 note = existing?.note,
-                cities = existing?.cities ?: emptyList(),
-                trips = when (status) {
-                    CountryStatus.VISITED -> maxOf(existing?.trips ?: 0, 1)
-                    CountryStatus.WISHLIST -> existing?.trips ?: 0
-                },
+                tags = existing?.places ?: emptyList(),
+                trips = existing?.trips ?: 0,
             )
         )
     }
+
+    /** Records a trip; the country becomes visited if it wasn't already. */
+    suspend fun addVisit(
+        iso2: String,
+        start: LocalDate,
+        end: LocalDate,
+        cities: List<String>,
+        existing: CountryWithState?,
+    ) {
+        visitDao.insert(
+            VisitEntity(
+                iso2 = iso2,
+                startDay = start.toEpochDay(),
+                endDay = end.toEpochDay(),
+                cities = cities.map { it.trim() }.filter { it.isNotEmpty() },
+            )
+        )
+        if (existing?.status != CountryStatus.VISITED) {
+            setStatus(iso2, CountryStatus.VISITED, existing)
+        }
+    }
+
+    suspend fun deleteVisit(id: Long) = visitDao.delete(id)
 
     suspend fun updateDetails(
         current: CountryWithState,
         firstVisitYear: Int? = current.firstVisitYear,
         note: String? = current.note,
-        cities: List<String> = current.cities,
+        places: List<String> = current.places,
         trips: Int = current.trips,
     ) {
         val status = current.status ?: return
@@ -64,11 +99,14 @@ class AtlasRepository(private val dao: CountryStateDao) {
                 status = status.name,
                 firstVisitYear = firstVisitYear,
                 note = note?.takeUnless { it.isBlank() },
-                cities = cities.map { it.trim() }.filter { it.isNotEmpty() },
+                tags = places.map { it.trim() }.filter { it.isNotEmpty() },
                 trips = trips.coerceIn(0, 999),
             )
         )
     }
 
-    suspend fun clear(iso2: String) = dao.delete(iso2)
+    suspend fun clear(iso2: String) {
+        visitDao.deleteAllFor(iso2)
+        dao.delete(iso2)
+    }
 }

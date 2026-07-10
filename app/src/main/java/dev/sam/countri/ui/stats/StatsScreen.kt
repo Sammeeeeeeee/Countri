@@ -30,8 +30,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -39,6 +41,7 @@ import dev.sam.countri.data.catalog.WORLD_COUNTRY_COUNT
 import dev.sam.countri.domain.AtlasStats
 import dev.sam.countri.ui.AtlasViewModel
 import dev.sam.countri.ui.components.SectionLabel
+import dev.sam.countri.ui.components.flagEmoji
 import dev.sam.countri.ui.theme.Countri
 import dev.sam.countri.ui.theme.CountriType
 import dev.sam.countri.ui.theme.MonoFamily
@@ -129,12 +132,12 @@ fun StatsScreen(viewModel: AtlasViewModel) {
                     }
                     Column {
                         Text(
-                            "${(stats.cityTotal * p).roundToInt()}",
+                            "${(stats.placeTotal * p).roundToInt()}",
                             style = CountriType.subtitle,
                             color = palette.textPrimary,
                         )
                         Text(
-                            "Cities",
+                            "Places",
                             style = CountriType.monoSmall,
                             color = palette.textSecondary,
                             modifier = Modifier.padding(top = 3.dp),
@@ -161,7 +164,8 @@ fun StatsScreen(viewModel: AtlasViewModel) {
                         Text(
                             stat.continent.displayName,
                             style = CountriType.bodySmall,
-                            color = palette.textPrimary.copy(alpha = 0.82f),
+                            color = palette.continentColor(stat.continent)
+                                .copy(alpha = if (stat.visited > 0) 1f else 0.45f),
                         )
                         Text(
                             "${stat.visited} / ${stat.continent.total}",
@@ -184,7 +188,7 @@ fun StatsScreen(viewModel: AtlasViewModel) {
                                 )
                                 .height(6.dp)
                                 .clip(CircleShape)
-                                .background(palette.visited)
+                                .background(palette.continentColor(stat.continent))
                         )
                     }
                 }
@@ -206,18 +210,34 @@ fun StatsScreen(viewModel: AtlasViewModel) {
                         )
                         TimelineSpine(isLast = index == stats.timeline.lastIndex)
                         Column(Modifier.padding(bottom = 18.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    if (group.isoCodes.size == 1) "1 country"
+                                    else "${group.isoCodes.size} countries",
+                                    style = CountriType.bodySmall,
+                                    color = palette.textPrimary.copy(alpha = 0.85f),
+                                )
+                                if (group.totalDays > 0) {
+                                    Text(
+                                        "  ·  ${group.totalDays} days",
+                                        style = CountriType.monoSmall,
+                                        color = palette.textFaint,
+                                    )
+                                }
+                            }
                             Text(
-                                if (group.isoCodes.size == 1) "1 country"
-                                else "${group.isoCodes.size} countries",
-                                style = CountriType.bodySmall,
-                                color = palette.textPrimary.copy(alpha = 0.85f),
-                            )
-                            Text(
-                                group.isoCodes.joinToString("  "),
-                                style = CountriType.monoSmall,
-                                color = palette.textFaint,
+                                group.isoCodes.joinToString(" ") { flagEmoji(it) },
+                                style = CountriType.body,
                                 modifier = Modifier.padding(top = 2.dp),
                             )
+                            if (group.cities.isNotEmpty()) {
+                                Text(
+                                    group.cities.joinToString(" · "),
+                                    style = CountriType.bodySmall,
+                                    color = palette.textFaint,
+                                    modifier = Modifier.padding(top = 2.dp),
+                                )
+                            }
                         }
                     }
                 }
@@ -277,19 +297,26 @@ private fun ProgressRing(fraction: Float, label: String, sublabel: String) {
                 style = Stroke(stroke, cap = StrokeCap.Round),
             )
             if (fraction > 0.002f) {
-                drawArc(
-                    color = palette.visited,
-                    startAngle = -90f,
-                    sweepAngle = 360f * fraction.coerceAtMost(1f),
-                    useCenter = false,
-                    topLeft = Offset(inset, inset),
-                    size = arcSize,
-                    style = Stroke(stroke, cap = StrokeCap.Round),
-                )
+                // Sweep through the aurora, starting from 12 o'clock.
+                rotate(-90f) {
+                    drawArc(
+                        color = palette.visited,
+                        startAngle = 0f,
+                        sweepAngle = 360f * fraction.coerceAtMost(1f),
+                        useCenter = false,
+                        topLeft = Offset(inset, inset),
+                        size = arcSize,
+                        style = Stroke(stroke, cap = StrokeCap.Round),
+                    )
+                }
             }
         }
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(label, style = CountriType.displaySmall, color = palette.visited)
+            Text(
+                label,
+                style = CountriType.displaySmall,
+                color = palette.visited,
+            )
             Text(
                 sublabel,
                 style = CountriType.monoSmall,

@@ -1,6 +1,10 @@
-package dev.sam.countri.ui.atlas
+﻿package dev.sam.countri.ui.atlas
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -18,6 +22,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -25,7 +30,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
+import kotlin.math.roundToInt
 import dev.sam.countri.data.catalog.CountryCatalog
 import dev.sam.countri.domain.CountryWithState
 import dev.sam.countri.ui.AtlasViewModel
@@ -52,7 +62,7 @@ fun AtlasScreen(
     val stats by viewModel.stats.collectAsState()
     val recent = remember(countries) {
         countries.filter { it.isVisited }
-            .sortedByDescending { it.firstVisitYear ?: 0 }
+            .sortedByDescending { it.firstYear ?: 0 }
             .take(4)
     }
 
@@ -96,21 +106,24 @@ fun AtlasScreen(
         ) {
             AtlasMap(viewModel, onCountryClick)
 
-            Column(
+            // The one chromatic element in the whole app: the cobalt ribbon.
+            Row(
                 Modifier
                     .align(Alignment.BottomStart)
                     .padding(start = 22.dp, bottom = 18.dp)
+                    .clip(CircleShape)
+                    .background(Brush.horizontalGradient(palette.aurora))
+                    .padding(horizontal = 16.dp, vertical = 9.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
+                val pctProgress = remember { Animatable(0f) }
+                LaunchedEffect(stats.percentOfWorld) {
+                    pctProgress.animateTo(1f, tween(1100, easing = CubicBezierEasing(0.2f, 0.8f, 0.2f, 1f)))
+                }
                 Text(
-                    "${stats.percentOfWorld}%",
-                    style = CountriType.displayLarge,
-                    color = palette.visited,
-                )
-                Text(
-                    "of the world",
-                    style = CountriType.bodySmall,
-                    color = palette.textSecondary,
-                    modifier = Modifier.padding(top = 2.dp),
+                    "${(stats.percentOfWorld * pctProgress.value).roundToInt()}% of the world",
+                    style = CountriType.subtitle,
+                    color = androidx.compose.ui.graphics.Color.White,
                 )
             }
 
@@ -121,8 +134,8 @@ fun AtlasScreen(
                 verticalArrangement = Arrangement.spacedBy(9.dp),
                 horizontalAlignment = Alignment.End,
             ) {
-                LegendRow("Visited", palette.visited)
-                LegendRow("Wishlist", palette.wishlist)
+                LegendSwatch("Visited", filled = true)
+                LegendSwatch("Wishlist", filled = false)
             }
         }
 
@@ -130,7 +143,7 @@ fun AtlasScreen(
         Column(
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp))
+                .clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
                 .background(palette.surface1)
                 .drawBehind {
                     drawRect(palette.hairline, size = size.copy(height = 1.dp.toPx()))
@@ -203,6 +216,8 @@ private fun AtlasMap(
         data = viewModel.worldMap,
         statuses = statuses,
         mode = viewModel.mapMode,
+        introUnwrap = !viewModel.introPlayed,
+        onIntroConsumed = { viewModel.introPlayed = true },
         justAddedIso = justAdded,
         onCountryTap = onCountryClick,
         modifier = Modifier.fillMaxSize(),
@@ -214,9 +229,9 @@ private fun ModeToggle(mode: MapMode, onMode: (MapMode) -> Unit) {
     val palette = Countri.palette
     Row(
         Modifier
-            .clip(RoundedCornerShape(11.dp))
+            .clip(CircleShape)
             .background(palette.surface1)
-            .hairline(RoundedCornerShape(11.dp))
+            .hairline(CircleShape)
             .padding(3.dp)
     ) {
         ToggleChip("Flat", mode == MapMode.Flat) { onMode(MapMode.Flat) }
@@ -240,7 +255,7 @@ private fun ToggleChip(text: String, selected: Boolean, onClick: () -> Unit) {
         style = CountriType.mono,
         color = fg,
         modifier = Modifier
-            .clip(RoundedCornerShape(8.dp))
+            .clip(CircleShape)
             .background(bg)
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
@@ -252,18 +267,33 @@ private fun ToggleChip(text: String, selected: Boolean, onClick: () -> Unit) {
 }
 
 @Composable
-private fun LegendRow(label: String, color: androidx.compose.ui.graphics.Color) {
+private fun LegendSwatch(label: String, filled: Boolean) {
     val palette = Countri.palette
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(7.dp),
     ) {
-        Box(
-            Modifier
-                .size(8.dp)
-                .clip(CircleShape)
-                .background(color)
-        )
+        if (filled) {
+            Box(
+                Modifier
+                    .size(width = 18.dp, height = 10.dp)
+                    .clip(RoundedCornerShape(3.dp))
+                    .background(palette.visited)
+            )
+        } else {
+            Canvas(Modifier.size(width = 18.dp, height = 10.dp)) {
+                drawRoundRect(
+                    color = palette.wishlist.copy(alpha = 0.75f),
+                    cornerRadius = CornerRadius(3.dp.toPx()),
+                    style = Stroke(
+                        width = 1.2.dp.toPx(),
+                        pathEffect = PathEffect.dashPathEffect(
+                            floatArrayOf(3.dp.toPx(), 2.5.dp.toPx()),
+                        ),
+                    ),
+                )
+            }
+        }
         Text(label, style = CountriType.monoSmall, color = palette.textSecondary)
     }
 }
@@ -301,7 +331,7 @@ private fun RecentRow(
         Column(Modifier.weight(1f)) {
             Text(entry.country.name, style = CountriType.body, color = palette.textPrimary)
             Text(
-                "${entry.country.continent.displayName} · ${entry.firstVisitYear ?: "—"}",
+                "${entry.country.continent.displayName} · ${entry.firstYear ?: "—"}",
                 style = CountriType.bodySmall,
                 color = palette.textFaint,
             )

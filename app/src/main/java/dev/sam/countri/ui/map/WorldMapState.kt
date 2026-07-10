@@ -10,13 +10,40 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 
 /**
- * Globe/morph state that outlives recomposition: rotation, fling velocity,
- * auto-rotation ramp, and the flat↔globe morph parameter.
+ * Map view state that outlives recomposition: the flat pan/zoom camera,
+ * globe rotation, fling velocity, auto-rotation ramp, and the flat↔globe
+ * morph parameter.
  */
 class WorldMapState(initialMode: MapMode) {
     /** 0 = flat, 1 = globe; animated with a spring when the mode changes. */
     val morph = Animatable(if (initialMode == MapMode.Globe) 1f else 0f)
 
+    // ---- flat camera ----
+    var centerLon by mutableFloatStateOf(MapViewport.World.centerLon)
+    var centerLat by mutableFloatStateOf(MapViewport.World.centerLat)
+    var zoom by mutableFloatStateOf(1f)
+
+    val flatViewport: MapViewport get() = MapViewport(centerLon, centerLat, zoom)
+
+    /** Keeps the camera inside the world band for the current canvas size. */
+    fun clampCamera(w: Float, h: Float) {
+        zoom = zoom.coerceIn(1f, MAX_ZOOM)
+        val s = MapProjection.flatScale(w, h, zoom)
+        val halfLon = w / (2f * s)
+        val halfLat = h / (2f * s)
+        centerLon = clampCentered(centerLon, -180f + halfLon, 180f - halfLon, 11f)
+        centerLat = clampCentered(
+            centerLat,
+            MapProjection.MIN_LAT + halfLat,
+            MapProjection.MAX_LAT - halfLat,
+            16f,
+        )
+    }
+
+    private fun clampCentered(v: Float, min: Float, max: Float, fallback: Float): Float =
+        if (min > max) fallback else v.coerceIn(min, max)
+
+    // ---- globe ----
     var rotationDeg by mutableFloatStateOf(INITIAL_ROTATION)
 
     /** Residual fling velocity in degrees/second. */
@@ -36,6 +63,7 @@ class WorldMapState(initialMode: MapMode) {
     }
 
     companion object {
+        const val MAX_ZOOM = 8f
         const val AUTO_SPEED = 4f // deg/s
         const val AUTO_RAMP_SECONDS = 1.5f
         const val IDLE_BEFORE_AUTO_MS = 3_000L

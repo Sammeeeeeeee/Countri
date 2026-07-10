@@ -27,12 +27,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import dev.sam.countri.ui.AtlasViewModel
 import dev.sam.countri.ui.components.CountriIcons
 import dev.sam.countri.ui.components.StatusPill
+import dev.sam.countri.ui.components.flagEmoji
 import dev.sam.countri.ui.theme.Countri
 import dev.sam.countri.ui.theme.CountriType
-import dev.sam.countri.ui.theme.MonoFamily
 import dev.sam.countri.ui.theme.pressScale
 import dev.sam.countri.ui.theme.staggeredEnter
 
@@ -100,12 +101,12 @@ fun WishlistScreen(
                             .staggeredEnter(index)
                             .fillMaxWidth()
                             .pressScale(0.98f)
-                            .clip(RoundedCornerShape(18.dp))
+                            .clip(RoundedCornerShape(20.dp))
                             .background(palette.surface1)
                             .border(
                                 1.dp,
                                 palette.wishlist.copy(alpha = 0.18f),
-                                RoundedCornerShape(18.dp),
+                                RoundedCornerShape(20.dp),
                             )
                             .clickable(
                                 interactionSource = remember { MutableInteractionSource() },
@@ -122,9 +123,8 @@ fun WishlistScreen(
                             contentAlignment = Alignment.Center,
                         ) {
                             Text(
-                                entry.country.iso2,
-                                style = CountriType.mono.copy(fontFamily = MonoFamily),
-                                color = palette.wishlist,
+                                flagEmoji(entry.country.iso2),
+                                style = CountriType.body.copy(fontSize = 22.sp),
                             )
                         }
                         Column(Modifier.weight(1f)) {

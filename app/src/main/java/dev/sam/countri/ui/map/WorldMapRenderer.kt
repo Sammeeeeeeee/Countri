@@ -1,5 +1,6 @@
 package dev.sam.countri.ui.map
 
+import android.graphics.DashPathEffect
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RadialGradient
@@ -7,6 +8,7 @@ import android.graphics.Shader
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
+import dev.sam.countri.data.catalog.CountryCatalog
 import dev.sam.countri.data.map.WorldMapData
 import dev.sam.countri.domain.CountryStatus
 import dev.sam.countri.ui.theme.CountriPalette
@@ -17,16 +19,18 @@ class MapColors(palette: CountriPalette) {
     val isDark = palette.isDark
     val land = palette.mapLand.toArgb()
     val border = palette.mapBorder.toArgb()
-    val visited = palette.visited.toArgb()
     val wishlist = palette.wishlist.toArgb()
     val sphereCenter = palette.globeShade.toArgb()
     val sphereEdge = palette.canvas.copy(alpha = 0f).toArgb()
+    /** Continent hues, ordinal-indexed — visited countries wear these. */
+    val continents = IntArray(palette.continents.size) { palette.continents[it].toArgb() }
 }
 
 /**
  * Draws the whole world as filled country silhouettes on a Compose Canvas.
- * One instance per WorldMapData; every buffer is preallocated, and the only
- * steady-state allocation per frame is zero.
+ * Visited countries fill with their continent's hue; wishlist countries are
+ * dashed outlines — uncolored until the trip happens. Zero steady-state
+ * allocation per frame.
  */
 class WorldMapRenderer(private val data: WorldMapData) {
 
@@ -35,9 +39,15 @@ class WorldMapRenderer(private val data: WorldMapData) {
     private val y = FloatArray(n)
     private val depth = FloatArray(n)
 
+    private val countryCount = 196
+
+    /** Catalog index (1-based) → continent ordinal; -1 for untagged land. */
+    private val continentOf = IntArray(countryCount) { idx ->
+        if (idx == 0) -1 else CountryCatalog.all[idx - 1].continent.ordinal
+    }
+
     // Reused Path per catalog index (0 = untagged land). Even-odd fill keeps
     // enclave holes (Lesotho) open.
-    private val countryCount = 196
     private val paths = Array(countryCount) { Path().apply { fillType = Path.FillType.EVEN_ODD } }
     private val pathUsed = BooleanArray(countryCount)
     private val depthSum = FloatArray(countryCount)
@@ -48,15 +58,14 @@ class WorldMapRenderer(private val data: WorldMapData) {
         style = Paint.Style.STROKE
         strokeJoin = Paint.Join.ROUND
     }
+    private val dashPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeJoin = Paint.Join.ROUND
+    }
+    private var dashScale = 0f
     private val spherePaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private var sphereShaderKey = 0f
 
-    /**
-     * @param morph 0 flat … 1 globe
-     * @param pulseIndex catalog index playing the just-added pulse, or 0
-     * @param pulseProgress 0..1 phase of the expanding pulse ring
-     * @param selectedIndex highlighted country (detail locator), or 0
-     */
     fun draw(
         scope: DrawScope,
         colors: MapColors,
@@ -76,7 +85,7 @@ class WorldMapRenderer(private val data: WorldMapData) {
 
         MapProjection.projectAll(data, viewport, w, h, rotationDeg, morph, x, y, depth)
 
-        // ---- sphere disk under the globe ----
+        // ---- sphere disk + aurora wash under the globe ----
         if (morph > 0.01f) {
             val r = MapProjection.globeRadius(w, h)
             if (sphereShaderKey != r) {
@@ -94,22 +103,26 @@ class WorldMapRenderer(private val data: WorldMapData) {
 
         buildPaths(w, h, morph)
 
-        // ---- fills ----
+        // ---- land fills ----
         for (c in 0 until countryCount) {
             if (!pathUsed[c]) continue
             val alpha = countryAlpha(c, morph)
             if (alpha < 0.02f) continue
             val status = statuses[c]
-            fillPaint.color = when (status) {
-                CountryStatus.VISITED -> colors.visited
-                CountryStatus.WISHLIST -> colors.wishlist
-                null -> colors.land
+            when (status) {
+                CountryStatus.VISITED -> {
+                    fillPaint.color = continentHue(colors, c)
+                    fillPaint.alpha = (alpha * if (colors.isDark) 96 else 72).toInt()
+                }
+                CountryStatus.WISHLIST -> {
+                    fillPaint.color = colors.wishlist
+                    fillPaint.alpha = (alpha * 14).toInt()
+                }
+                null -> {
+                    fillPaint.color = colors.land
+                    fillPaint.alpha = (alpha * 255).toInt()
+                }
             }
-            fillPaint.alpha = (alpha * when (status) {
-                CountryStatus.VISITED -> if (colors.isDark) 82 else 60
-                CountryStatus.WISHLIST -> if (colors.isDark) 74 else 56
-                null -> 255
-            }).toInt()
             canvas.drawPath(paths[c], fillPaint)
         }
 
@@ -124,35 +137,44 @@ class WorldMapRenderer(private val data: WorldMapData) {
             canvas.drawPath(paths[c], strokePaint)
         }
 
-        // ---- accent strokes + glow for tracked countries ----
+        // ---- tracked-country chrome ----
+        if (dashScale != density) {
+            dashScale = density
+            dashPaint.pathEffect = DashPathEffect(
+                floatArrayOf(4.5f * density, 3.5f * density), 0f,
+            )
+        }
         for ((c, status) in statuses) {
             if (c !in 1 until countryCount || !pathUsed[c]) continue
             val alpha = countryAlpha(c, morph)
             if (alpha < 0.02f) continue
-            val accent = if (status == CountryStatus.VISITED) colors.visited else colors.wishlist
-            if (colors.isDark) {
-                strokePaint.color = accent
-                strokePaint.strokeWidth = 4.5f * density
-                strokePaint.alpha = (alpha * 38).toInt()
+            if (status == CountryStatus.VISITED) {
+                val hue = continentHue(colors, c)
+                if (colors.isDark) {
+                    strokePaint.color = hue
+                    strokePaint.strokeWidth = 4.5f * density
+                    strokePaint.alpha = (alpha * 40).toInt()
+                    canvas.drawPath(paths[c], strokePaint)
+                }
+                strokePaint.color = hue
+                strokePaint.strokeWidth = 1.2f * density
+                strokePaint.alpha = (alpha * 225).toInt()
                 canvas.drawPath(paths[c], strokePaint)
+            } else {
+                dashPaint.color = colors.wishlist
+                dashPaint.strokeWidth = 1.3f * density
+                dashPaint.alpha = (alpha * 165).toInt()
+                canvas.drawPath(paths[c], dashPaint)
             }
-            strokePaint.color = accent
-            strokePaint.strokeWidth = 1.2f * density
-            strokePaint.alpha = (alpha * 220).toInt()
-            canvas.drawPath(paths[c], strokePaint)
         }
 
         // ---- selection emphasis (detail locator) ----
         if (selectedIndex in 1 until countryCount && pathUsed[selectedIndex]) {
-            val status = statuses[selectedIndex]
-            val accent = when (status) {
-                CountryStatus.WISHLIST -> colors.wishlist
-                else -> colors.visited
-            }
-            fillPaint.color = accent
-            fillPaint.alpha = if (colors.isDark) 96 else 70
+            val hue = continentHue(colors, selectedIndex)
+            fillPaint.color = hue
+            fillPaint.alpha = if (colors.isDark) 110 else 84
             canvas.drawPath(paths[selectedIndex], fillPaint)
-            strokePaint.color = accent
+            strokePaint.color = hue
             strokePaint.strokeWidth = 1.6f * density
             strokePaint.alpha = 255
             canvas.drawPath(paths[selectedIndex], strokePaint)
@@ -160,13 +182,16 @@ class WorldMapRenderer(private val data: WorldMapData) {
 
         // ---- just-added pulse ----
         if (pulseIndex in 1 until countryCount && pathUsed[pulseIndex] && pulseProgress > 0f) {
-            val status = statuses[pulseIndex]
-            val accent = if (status == CountryStatus.WISHLIST) colors.wishlist else colors.visited
-            strokePaint.color = accent
+            strokePaint.color = continentHue(colors, pulseIndex)
             strokePaint.strokeWidth = (1.5f + 9f * pulseProgress) * density
             strokePaint.alpha = ((1f - pulseProgress) * 170).toInt()
             canvas.drawPath(paths[pulseIndex], strokePaint)
         }
+    }
+
+    private fun continentHue(colors: MapColors, c: Int): Int {
+        val ord = continentOf[c]
+        return if (ord >= 0) colors.continents[ord] else colors.land
     }
 
     private fun countryAlpha(c: Int, morph: Float): Float {
@@ -174,8 +199,9 @@ class WorldMapRenderer(private val data: WorldMapData) {
         val count = depthCount[c]
         if (count == 0) return 1f
         val avg = depthSum[c] / count
-        // smoothstep(-0.12, 0.18, avg): fade countries as they roll behind.
-        val t = ((avg + 0.12f) / 0.30f).coerceIn(0f, 1f)
+        // smoothstep(-0.05, 0.35, avg): fade countries out well before they
+        // roll behind, so limb-clamped slivers never read as scratches.
+        val t = ((avg + 0.05f) / 0.40f).coerceIn(0f, 1f)
         val vis = t * t * (3f - 2f * t)
         return 1f + (vis - 1f) * morph
     }

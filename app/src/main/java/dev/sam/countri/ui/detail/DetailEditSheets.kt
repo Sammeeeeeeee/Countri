@@ -27,6 +27,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -37,6 +38,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.unit.dp
+import dev.sam.countri.data.wiki.WikiPlace
+import dev.sam.countri.data.wiki.WikiSearch
 import dev.sam.countri.domain.CountryWithState
 import dev.sam.countri.ui.components.CountriIcons
 import dev.sam.countri.ui.components.LocalHaptics
@@ -45,11 +48,12 @@ import dev.sam.countri.ui.theme.CountriType
 import dev.sam.countri.ui.theme.MonoFamily
 import dev.sam.countri.ui.theme.hairline
 import dev.sam.countri.ui.theme.pressScale
+import kotlinx.coroutines.delay
 import java.time.Year
 
-enum class EditTarget { YearOfVisit, Trips, Note, Cities }
+enum class EditTarget { YearOfVisit, Trips, Places }
 
-/** One sheet, four editors — every detail edit shares this frame. */
+/** One sheet, three editors — every detail edit shares this frame. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DetailEditSheet(
@@ -58,15 +62,14 @@ fun DetailEditSheet(
     onDismiss: () -> Unit,
     onSaveYear: (Int) -> Unit,
     onSaveTrips: (Int) -> Unit,
-    onSaveNote: (String) -> Unit,
-    onSaveCities: (List<String>) -> Unit,
+    onSavePlaces: (List<String>) -> Unit,
 ) {
     val palette = Countri.palette
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         containerColor = palette.surface2,
         contentWindowInsets = { WindowInsets(0) },
-        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+        shape = RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp),
     ) {
         Column(
             Modifier
@@ -79,8 +82,7 @@ fun DetailEditSheet(
             when (target) {
                 EditTarget.YearOfVisit -> YearEditor(entry, onSaveYear)
                 EditTarget.Trips -> TripsEditor(entry, onSaveTrips)
-                EditTarget.Note -> NoteEditor(entry, onSaveNote)
-                EditTarget.Cities -> CitiesEditor(entry, onSaveCities)
+                EditTarget.Places -> PlacesEditor(entry, onSavePlaces)
             }
         }
     }
@@ -105,7 +107,7 @@ private fun SaveButton(text: String = "Save", onClick: () -> Unit) {
             .fillMaxWidth()
             .height(52.dp)
             .pressScale(0.97f)
-            .clip(RoundedCornerShape(14.dp))
+            .clip(CircleShape)
             .background(palette.visited)
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
@@ -219,78 +221,57 @@ private fun StepperButton(glyph: String, onClick: () -> Unit) {
     }
 }
 
-@Composable
-private fun NoteEditor(entry: CountryWithState, onSave: (String) -> Unit) {
-    val palette = Countri.palette
-    var note by rememberSaveable { mutableStateOf(entry.note ?: "") }
-
-    SheetTitle("A line to remember it by")
-    BasicTextField(
-        value = note,
-        onValueChange = { if (it.length <= 120) note = it },
-        textStyle = CountriType.body.copy(color = palette.textPrimary),
-        cursorBrush = SolidColor(palette.visited),
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
-            .background(palette.surface1)
-            .hairline(RoundedCornerShape(14.dp))
-            .padding(14.dp),
-        minLines = 2,
-        maxLines = 4,
-        decorationBox = { inner ->
-            Box {
-                if (note.isEmpty()) {
-                    Text(
-                        "Balconies, night trains, that one café…",
-                        style = CountriType.body,
-                        color = palette.textFaint,
-                    )
-                }
-                inner()
-            }
-        },
-    )
-    SaveButton { onSave(note.trim()) }
-}
-
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun CitiesEditor(entry: CountryWithState, onSave: (List<String>) -> Unit) {
+private fun PlacesEditor(entry: CountryWithState, onSave: (List<String>) -> Unit) {
     val palette = Countri.palette
     val haptics = LocalHaptics.current
-    var cities by rememberSaveable { mutableStateOf(entry.cities) }
+    val accent = palette.continentColor(entry.country.continent)
+    var places by rememberSaveable { mutableStateOf(entry.places) }
     var draft by rememberSaveable { mutableStateOf("") }
+    var suggestions by remember { mutableStateOf<List<WikiPlace>>(emptyList()) }
 
-    fun addDraft() {
-        val name = draft.trim()
-        if (name.isNotEmpty() && cities.none { it.equals(name, ignoreCase = true) }) {
-            cities = cities + name
+    // Search-as-you-type against Wikipedia, debounced.
+    LaunchedEffect(draft) {
+        val q = draft.trim()
+        if (q.length < 2) {
+            suggestions = emptyList()
+            return@LaunchedEffect
+        }
+        delay(280)
+        suggestions = WikiSearch.search(q)
+    }
+
+    fun add(name: String) {
+        val trimmed = name.trim()
+        if (trimmed.isNotEmpty() && places.none { it.equals(trimmed, ignoreCase = true) }) {
+            places = places + trimmed
             haptics.tick()
         }
         draft = ""
+        suggestions = emptyList()
     }
 
-    SheetTitle("Cities")
-    if (cities.isNotEmpty()) {
+    SheetTitle(if (entry.isVisited) "Places you went" else "Places to see")
+    if (places.isNotEmpty()) {
         FlowRow(
             horizontalArrangement = Arrangement.spacedBy(9.dp),
             verticalArrangement = Arrangement.spacedBy(9.dp),
             modifier = Modifier.padding(bottom = 14.dp),
         ) {
-            cities.forEach { city ->
+            places.forEach { place ->
                 Row(
                     modifier = Modifier
                         .clip(CircleShape)
                         .background(palette.surface1)
-                        .hairline(CircleShape)
+                        .hairline(CircleShape, accent.copy(alpha = 0.25f))
                         .padding(start = 14.dp, end = 8.dp, top = 7.dp, bottom = 7.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text(city, style = CountriType.bodySmall, color = palette.textPrimary)
+                    Text(place, style = CountriType.bodySmall, color = palette.textPrimary)
                     Icon(
                         CountriIcons.Close,
-                        contentDescription = "Remove $city",
+                        contentDescription = "Remove $place",
                         tint = palette.textFaint,
                         modifier = Modifier
                             .padding(start = 6.dp)
@@ -299,7 +280,7 @@ private fun CitiesEditor(entry: CountryWithState, onSave: (List<String>) -> Unit
                                 interactionSource = remember { MutableInteractionSource() },
                                 indication = null,
                             ) {
-                                cities = cities - city
+                                places = places - place
                                 haptics.tick()
                             },
                     )
@@ -307,50 +288,97 @@ private fun CitiesEditor(entry: CountryWithState, onSave: (List<String>) -> Unit
             }
         }
     }
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        BasicTextField(
-            value = draft,
-            onValueChange = { if (it.length <= 40) draft = it },
-            singleLine = true,
-            textStyle = CountriType.body.copy(color = palette.textPrimary),
-            cursorBrush = SolidColor(palette.visited),
-            modifier = Modifier
-                .weight(1f)
-                .clip(RoundedCornerShape(14.dp))
-                .background(palette.surface1)
-                .hairline(RoundedCornerShape(14.dp))
-                .padding(14.dp),
-            decorationBox = { inner ->
-                Box {
-                    if (draft.isEmpty()) {
-                        Text("Add a city", style = CountriType.body, color = palette.textFaint)
-                    }
-                    inner()
+
+    BasicTextField(
+        value = draft,
+        onValueChange = { if (it.length <= 60) draft = it },
+        singleLine = true,
+        textStyle = CountriType.body.copy(color = palette.textPrimary),
+        cursorBrush = SolidColor(accent),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(palette.surface1)
+            .hairline(RoundedCornerShape(16.dp))
+            .padding(14.dp),
+        decorationBox = { inner ->
+            Box {
+                if (draft.isEmpty()) {
+                    Text(
+                        "Buckingham Palace, Machu Picchu…",
+                        style = CountriType.body,
+                        color = palette.textFaint,
+                    )
                 }
-            },
-        )
-        Box(
-            modifier = Modifier
-                .size(48.dp)
-                .pressScale(0.9f)
-                .clip(RoundedCornerShape(14.dp))
-                .background(palette.visitedDim)
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                ) { addDraft() },
-            contentAlignment = Alignment.Center,
+                inner()
+            }
+        },
+    )
+
+    // Wikipedia suggestions — tap to add; saved places open their page.
+    if (suggestions.isNotEmpty() || draft.trim().length >= 2) {
+        Column(
+            Modifier
+                .padding(top = 8.dp)
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp))
+                .background(palette.surface1)
+                .hairline(RoundedCornerShape(16.dp))
         ) {
-            Icon(
-                CountriIcons.Plus,
-                contentDescription = "Add city",
-                tint = palette.visited,
-                modifier = Modifier.size(18.dp),
-            )
+            suggestions.forEach { suggestion ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                        ) { add(suggestion.title) }
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            suggestion.title,
+                            style = CountriType.body,
+                            color = palette.textPrimary,
+                        )
+                        if (!suggestion.description.isNullOrBlank()) {
+                            Text(
+                                suggestion.description,
+                                style = CountriType.bodySmall,
+                                color = palette.textFaint,
+                                maxLines = 1,
+                            )
+                        }
+                    }
+                    Icon(
+                        CountriIcons.Plus,
+                        contentDescription = null,
+                        tint = accent,
+                        modifier = Modifier.size(14.dp),
+                    )
+                }
+            }
+            val exact = suggestions.any { it.title.equals(draft.trim(), ignoreCase = true) }
+            if (draft.trim().length >= 2 && !exact) {
+                Text(
+                    "Add “${draft.trim()}”",
+                    style = CountriType.bodySmall,
+                    color = accent,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                        ) { add(draft) }
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                )
+            }
         }
     }
+
     SaveButton {
-        addDraft()
-        onSave(cities)
+        if (draft.isNotBlank()) add(draft)
+        onSave(places)
     }
 }

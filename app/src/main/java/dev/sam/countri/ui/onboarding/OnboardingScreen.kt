@@ -6,7 +6,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
-import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -60,7 +60,7 @@ private val slides = listOf(
     Slide(
         kicker = "01 · KEEP COUNT",
         title = "One tap\nper country.",
-        body = "Add the year, the cities, and a line to remember it by.",
+        body = "Add the year, the places, and a line to remember it by.",
         cta = "Next",
     ),
     Slide(
@@ -166,7 +166,7 @@ fun OnboardingScreen(
                     .fillMaxWidth()
                     .height(56.dp)
                     .pressScale(0.97f)
-                    .clip(RoundedCornerShape(16.dp))
+                    .clip(CircleShape)
                     .background(palette.visited)
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
@@ -192,22 +192,37 @@ fun OnboardingScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                    repeat(slides.size) { i ->
-                        val width by animateDpAsState(
-                            targetValue = if (i == step) 20.dp else 7.dp,
-                            label = "dot",
-                        )
+                // Mono step counter + a thin line that fills as you go.
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        "0${step + 1}",
+                        style = CountriType.mono,
+                        color = palette.visited,
+                    )
+                    val lineProgress by animateFloatAsState(
+                        targetValue = (step + 1) / slides.size.toFloat(),
+                        animationSpec = Springs.Smooth,
+                        label = "obLine",
+                    )
+                    Box(
+                        Modifier
+                            .padding(horizontal = 10.dp)
+                            .size(width = 64.dp, height = 2.dp)
+                            .clip(CircleShape)
+                            .background(palette.textPrimary.copy(alpha = 0.14f))
+                    ) {
                         Box(
                             Modifier
-                                .size(width = width, height = 7.dp)
-                                .clip(CircleShape)
-                                .background(
-                                    if (i == step) palette.visited
-                                    else palette.textPrimary.copy(alpha = 0.2f)
-                                )
+                                .fillMaxWidth(lineProgress)
+                                .height(2.dp)
+                                .background(palette.visited)
                         )
                     }
+                    Text(
+                        "0${slides.size}",
+                        style = CountriType.mono,
+                        color = palette.textFaint,
+                    )
                 }
                 Text(
                     "Skip",

@@ -10,12 +10,12 @@ import org.junit.Test
 
 class StatsCalculatorTest {
 
-    private fun visited(iso: String, year: Int?, cities: List<String> = emptyList()) =
+    private fun visited(iso: String, year: Int?, places: List<String> = emptyList()) =
         CountryWithState(
             country = CountryCatalog.byIso2.getValue(iso),
             status = CountryStatus.VISITED,
             firstVisitYear = year,
-            cities = cities,
+            places = places,
             trips = 1,
         )
 
@@ -23,7 +23,7 @@ class StatsCalculatorTest {
         CountryWithState(CountryCatalog.byIso2.getValue(iso), CountryStatus.WISHLIST)
 
     @Test
-    fun `aggregates counts, percent, continents and cities`() {
+    fun `aggregates counts, percent, continents and places`() {
         val stats = StatsCalculator.calculate(
             listOf(
                 visited("FR", 2018, listOf("Paris", "Lyon")),
@@ -38,7 +38,7 @@ class StatsCalculatorTest {
         assertEquals(1, stats.wishlistCount)
         assertEquals(2, stats.percentOfWorld) // round(3/195*100) = 2
         assertEquals(2, stats.continentsVisited)
-        assertEquals(3, stats.cityTotal)
+        assertEquals(3, stats.placeTotal)
     }
 
     @Test

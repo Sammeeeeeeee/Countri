@@ -3,12 +3,15 @@ package dev.sam.countri.ui.map
 import android.os.SystemClock
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearOutSlowInEasing
+import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.calculateCentroid
+import androidx.compose.foundation.gestures.calculatePan
+import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.draggable
-import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -18,23 +21,27 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.isSpecified
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalViewConfiguration
 import dev.sam.countri.data.catalog.CountryCatalog
 import dev.sam.countri.data.map.WorldMapData
 import dev.sam.countri.domain.CountryStatus
 import dev.sam.countri.ui.theme.LocalCountriPalette
 import dev.sam.countri.ui.theme.Springs
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.exp
 import kotlin.math.min
 
 /**
  * The world, drawn as real country silhouettes. One composable serves the
- * Atlas hero (interactive, morphing), the onboarding backdrop (auto-rotating
- * globe), and the detail locator (zoomed flat viewport).
+ * Atlas hero (interactive: pinch-zoom/pan flat, spin globe, morphing), the
+ * onboarding backdrop (auto-rotating globe), and static locator crops.
  */
 @Composable
 fun WorldMap(
@@ -43,9 +50,11 @@ fun WorldMap(
     mode: MapMode,
     modifier: Modifier = Modifier,
     state: WorldMapState = rememberWorldMapState(mode),
-    viewport: MapViewport = MapViewport.World,
+    fixedViewport: MapViewport? = null,
     interactive: Boolean = true,
     autoRotate: Boolean = true,
+    introUnwrap: Boolean = false,
+    onIntroConsumed: () -> Unit = {},
     justAddedIso: String? = null,
     selectedIso: String? = null,
     onCountryTap: ((String) -> Unit)? = null,
@@ -54,13 +63,27 @@ fun WorldMap(
     val colors = remember(palette) { MapColors(palette) }
     val renderer = remember(data) { WorldMapRenderer(data) }
     val density = LocalDensity.current.density
+    val touchSlop = LocalViewConfiguration.current.touchSlop
     var canvasSize by remember { mutableStateOf(Size.Zero) }
 
     // ---- mode drives the morph spring; this IS the flat↔globe animation ----
-    LaunchedEffect(mode) {
-        val target = if (mode == MapMode.Globe) 1f else 0f
-        if (state.morph.value != target) {
-            state.morph.animateTo(target, Springs.Smooth)
+    LaunchedEffect(mode, introUnwrap) {
+        if (introUnwrap) {
+            // Opening move: the globe unwraps into the flat atlas.
+            onIntroConsumed()
+            state.morph.snapTo(1f)
+            state.rotationDeg = -75f
+            launch {
+                animate(-75f, WorldMapState.INITIAL_ROTATION, animationSpec = Springs.Gentle) { v, _ ->
+                    state.rotationDeg = v
+                }
+            }
+            state.morph.animateTo(if (mode == MapMode.Globe) 1f else 0f, Springs.Gentle)
+        } else {
+            val target = if (mode == MapMode.Globe) 1f else 0f
+            if (state.morph.value != target) {
+                state.morph.animateTo(target, Springs.Smooth)
+            }
         }
     }
 
@@ -114,35 +137,87 @@ fun WorldMap(
         }
     }
 
-    // ---- gestures ----
+    // ---- gestures: pan/pinch the flat map, spin the globe, tap anywhere ----
     var gestured = modifier.onSizeChanged { canvasSize = Size(it.width.toFloat(), it.height.toFloat()) }
     if (interactive) {
-        val dragState = rememberDraggableState { delta ->
-            if (state.morph.value > 0.5f && canvasSize.width > 0f) {
-                val r = MapProjection.globeRadius(canvasSize.width, canvasSize.height)
-                state.rotationDeg += delta / r * 57.29578f
-            }
-        }
         gestured = gestured
-            .draggable(
-                state = dragState,
-                orientation = Orientation.Horizontal,
-                onDragStarted = {
+            .pointerInput(Unit) {
+                awaitEachGesture {
+                    awaitFirstDown(requireUnconsumed = false)
                     state.dragging = true
                     state.flingVelocity = 0f
                     state.noteInteraction(SystemClock.uptimeMillis())
-                },
-                onDragStopped = { velocity ->
+                    var travelled = 0f
+                    var tracking = false
+                    var lastMs = SystemClock.uptimeMillis()
+                    var velocityEma = 0f
+                    while (true) {
+                        val event = awaitPointerEvent()
+                        if (event.changes.none { it.pressed }) break
+                        val pan = event.calculatePan()
+                        val zoomChange = event.calculateZoom()
+                        val centroid = event.calculateCentroid()
+                        travelled += abs(pan.x) + abs(pan.y)
+                        if (!tracking && (travelled > touchSlop || zoomChange != 1f)) tracking = true
+                        if (!tracking) continue
+
+                        val now = SystemClock.uptimeMillis()
+                        val dtMs = (now - lastMs).coerceAtLeast(1)
+                        lastMs = now
+                        val w = canvasSize.width
+                        val h = canvasSize.height
+                        if (w <= 0f) continue
+
+                        if (state.morph.value > 0.5f) {
+                            val r = MapProjection.globeRadius(w, h)
+                            val degrees = pan.x / r * 57.29578f
+                            state.rotationDeg += degrees
+                            velocityEma = velocityEma * 0.7f + (degrees / dtMs * 1000f) * 0.3f
+                        } else {
+                            val sOld = MapProjection.flatScale(w, h, state.zoom)
+                            if (zoomChange != 1f && centroid.isSpecified) {
+                                val geoLon = state.centerLon + (centroid.x - w / 2f) / sOld
+                                val geoLat = state.centerLat - (centroid.y - h / 2f) / sOld
+                                state.zoom = (state.zoom * zoomChange)
+                                    .coerceIn(1f, WorldMapState.MAX_ZOOM)
+                                val sNew = MapProjection.flatScale(w, h, state.zoom)
+                                state.centerLon = geoLon - (centroid.x - w / 2f) / sNew
+                                state.centerLat = geoLat + (centroid.y - h / 2f) / sNew
+                            }
+                            val s = MapProjection.flatScale(w, h, state.zoom)
+                            state.centerLon -= pan.x / s
+                            state.centerLat += pan.y / s
+                            state.clampCamera(w, h)
+                        }
+                        event.changes.forEach { if (it.positionChanged()) it.consume() }
+                        state.noteInteraction(now)
+                    }
                     state.dragging = false
-                    if (state.morph.value > 0.5f && canvasSize.width > 0f) {
-                        val r = MapProjection.globeRadius(canvasSize.width, canvasSize.height)
-                        state.flingVelocity = velocity / r * 57.29578f
+                    if (state.morph.value > 0.5f && abs(velocityEma) > 5f) {
+                        state.flingVelocity = velocityEma
                     }
                     state.noteInteraction(SystemClock.uptimeMillis())
-                },
-            )
-            .pointerInput(onCountryTap == null, viewport) {
-                detectTapGestures { offset ->
+                }
+            }
+            .pointerInput(onCountryTap == null) {
+                detectTapGestures(
+                    onDoubleTap = { offset ->
+                        // Double tap: zoom the flat map in (or reset from max).
+                        if (state.morph.value <= 0.05f && canvasSize.width > 0f) {
+                            val w = canvasSize.width
+                            val h = canvasSize.height
+                            val sOld = MapProjection.flatScale(w, h, state.zoom)
+                            val geoLon = state.centerLon + (offset.x - w / 2f) / sOld
+                            val geoLat = state.centerLat - (offset.y - h / 2f) / sOld
+                            state.zoom = if (state.zoom > 5.5f) 1f else state.zoom * 2.2f
+                            state.clampCamera(w, h)
+                            val sNew = MapProjection.flatScale(w, h, state.zoom)
+                            state.centerLon = geoLon - (offset.x - w / 2f) / sNew
+                            state.centerLat = geoLat + (offset.y - h / 2f) / sNew
+                            state.clampCamera(w, h)
+                        }
+                    },
+                ) { offset ->
                     val tap = onCountryTap ?: return@detectTapGestures
                     state.noteInteraction(SystemClock.uptimeMillis())
                     val m = state.morph.value
@@ -150,6 +225,7 @@ fun WorldMap(
                     val w = size.width.toFloat()
                     val h = size.height.toFloat()
                     val tolPx = 24f * density
+                    val viewport = fixedViewport ?: state.flatViewport
                     val lonLat: Pair<Float, Float>?
                     val tolDeg: Float
                     if (m <= 0.05f) {
@@ -174,7 +250,7 @@ fun WorldMap(
             scope = this,
             colors = colors,
             statuses = statuses,
-            viewport = viewport,
+            viewport = fixedViewport ?: state.flatViewport,
             rotationDeg = state.rotationDeg,
             morph = state.morph.value,
             pulseIndex = justAddedIndex,

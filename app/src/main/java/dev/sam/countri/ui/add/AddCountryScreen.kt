@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -42,9 +43,9 @@ import androidx.compose.ui.unit.dp
 import dev.sam.countri.domain.CountryStatus
 import dev.sam.countri.domain.CountryWithState
 import dev.sam.countri.ui.AtlasViewModel
+import dev.sam.countri.ui.components.CodeBadge
 import dev.sam.countri.ui.components.CountriIcons
 import dev.sam.countri.ui.components.LocalHaptics
-import dev.sam.countri.ui.components.StatusDot
 import dev.sam.countri.ui.map.MapMode
 import dev.sam.countri.ui.theme.Countri
 import dev.sam.countri.ui.theme.CountriType
@@ -103,7 +104,7 @@ fun AddCountryScreen(
                 modifier = Modifier
                     .size(34.dp)
                     .pressScale(0.9f)
-                    .clip(RoundedCornerShape(11.dp))
+                    .clip(RoundedCornerShape(12.dp))
                     .background(palette.surface1)
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
@@ -126,9 +127,9 @@ fun AddCountryScreen(
                 .fillMaxWidth()
                 .padding(horizontal = 22.dp)
                 .height(48.dp)
-                .clip(RoundedCornerShape(14.dp))
+                .clip(CircleShape)
                 .background(palette.surface1)
-                .hairline(RoundedCornerShape(14.dp)),
+                .hairline(CircleShape),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
@@ -228,7 +229,7 @@ private fun CountryRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        StatusDot(entry.status, size = 9.dp)
+        CodeBadge(entry.country.iso2, entry.status, size = 34.dp)
         Column(Modifier.weight(1f)) {
             Text(entry.country.name, style = CountriType.body, color = palette.textPrimary)
             Text(
@@ -252,7 +253,7 @@ private fun CountryRow(
         Box(
             modifier = Modifier
                 .size(26.dp)
-                .clip(RoundedCornerShape(9.dp))
+                .clip(RoundedCornerShape(12.dp))
                 .background(palette.visitedDim),
             contentAlignment = Alignment.Center,
         ) {
@@ -286,7 +287,7 @@ private fun QuickAddSheet(
         sheetState = sheetState,
         containerColor = palette.surface2,
         contentWindowInsets = { WindowInsets(0) },
-        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+        shape = RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp),
     ) {
         Column(
             Modifier
@@ -334,7 +335,7 @@ private fun QuickAddSheet(
                     .fillMaxWidth()
                     .height(56.dp)
                     .pressScale(0.97f)
-                    .clip(RoundedCornerShape(16.dp))
+                    .clip(CircleShape)
                     .background(palette.visited)
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
@@ -350,7 +351,7 @@ private fun QuickAddSheet(
                 Text("Add to atlas", style = CountriType.subtitle, color = palette.onVisited)
             }
             Text(
-                "Years, cities and notes live on the country page.",
+                "Years, places and notes live on the country page.",
                 style = CountriType.bodySmall,
                 color = palette.textFaint,
                 textAlign = TextAlign.Center,
@@ -384,9 +385,9 @@ private fun StatusChoice(
         modifier = modifier
             .height(52.dp)
             .pressScale(0.96f)
-            .clip(RoundedCornerShape(14.dp))
+            .clip(CircleShape)
             .background(bg)
-            .hairline(RoundedCornerShape(14.dp))
+            .hairline(CircleShape)
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,

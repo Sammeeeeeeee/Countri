@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <!-- Minimal globe mark: meridian arcs + equator inside the adaptive-icon safe zone -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
@@ -8,21 +8,21 @@
     <group>
         <path
             android:pathData="M54,32 A22,22 0 1,1 54,76 A22,22 0 1,1 54,32"
-            android:strokeColor="#CEF79E"
+            android:strokeColor="#1F1F1F"
             android:strokeWidth="3"
             android:fillColor="@android:color/transparent" />
         <path
             android:pathData="M54,32 A11,22 0 1,1 54,76 A11,22 0 1,1 54,32"
-            android:strokeColor="#CEF79E"
+            android:strokeColor="#1F1F1F"
             android:strokeWidth="2"
             android:fillColor="@android:color/transparent" />
         <path
             android:pathData="M32,54 L76,54"
-            android:strokeColor="#CEF79E"
+            android:strokeColor="#1F1F1F"
             android:strokeWidth="2"
             android:fillColor="@android:color/transparent" />
         <path
             android:pathData="M66,40 m-3.5,0 a3.5,3.5 0 1,1 7,0 a3.5,3.5 0 1,1 -7,0"
-            android:fillColor="#CEF79E" />
+            android:fillColor="#1F1F1F" />
     </group>
 </vector>

@@ -6,6 +6,7 @@ import androidx.room.PrimaryKey
 /**
  * One row per country the user has touched; absence of a row means the
  * country is untracked. status is stored as text for schema readability.
+ * tags = places to see / seen (Wikipedia titles).
  */
 @Entity(tableName = "country_state")
 data class CountryStateEntity(
@@ -13,6 +14,6 @@ data class CountryStateEntity(
     val status: String, // "VISITED" | "WISHLIST"
     val firstVisitYear: Int?,
     val note: String?,
-    val cities: List<String>,
+    val tags: List<String>,
     val trips: Int,
 )
