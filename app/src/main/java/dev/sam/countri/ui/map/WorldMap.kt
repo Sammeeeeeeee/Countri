@@ -18,6 +18,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Size
@@ -64,6 +65,7 @@ fun WorldMap(
     val renderer = remember(data) { WorldMapRenderer(data) }
     val density = LocalDensity.current.density
     val touchSlop = LocalViewConfiguration.current.touchSlop
+    val scope = rememberCoroutineScope()
     var canvasSize by remember { mutableStateOf(Size.Zero) }
 
     // ---- mode drives the morph spring; this IS the flat↔globe animation ----
@@ -100,12 +102,12 @@ fun WorldMap(
         }
     }
 
-    // ---- frame loop: only runs while the globe is live ----
-    val globeActive by remember {
-        derivedStateOf { state.morph.value > 0.01f }
+    // ---- frame loop: runs while the globe is live or the flat map coasts ----
+    val loopActive by remember {
+        derivedStateOf { state.morph.value > 0.01f || state.flatFlinging }
     }
-    LaunchedEffect(globeActive, autoRotate) {
-        if (!globeActive) {
+    LaunchedEffect(loopActive, autoRotate) {
+        if (!loopActive) {
             state.autoSpeed = 0f
             return@LaunchedEffect
         }
@@ -114,6 +116,24 @@ fun WorldMap(
             androidx.compose.runtime.withFrameNanos { now ->
                 if (last != 0L) {
                     val dt = ((now - last) / 1e9f).coerceAtMost(0.05f)
+
+                    // Flat map inertia: the pan keeps gliding after release.
+                    if (state.morph.value <= 0.01f && state.flatFlinging && !state.dragging &&
+                        canvasSize.width > 0f
+                    ) {
+                        val s = MapProjection.flatScale(canvasSize.width, canvasSize.height, state.zoom)
+                        state.centerLon -= state.flatVelX * dt / s
+                        state.centerLat += state.flatVelY * dt / s
+                        state.clampCamera(canvasSize.width, canvasSize.height)
+                        val decay = exp(-dt * 4.5f)
+                        state.flatVelX *= decay
+                        state.flatVelY *= decay
+                        if (!state.flatFlinging) {
+                            state.flatVelX = 0f
+                            state.flatVelY = 0f
+                        }
+                    }
+
                     var v = state.flingVelocity
                     if (abs(v) > 0.5f) {
                         state.rotationDeg += v * dt
@@ -122,7 +142,7 @@ fun WorldMap(
                     }
                     val idleMs = now / 1_000_000 - state.lastInteractionAt
                     val coasting = abs(state.flingVelocity) > 0.5f
-                    if (autoRotate && !state.dragging && !coasting &&
+                    if (state.morph.value > 0.01f && autoRotate && !state.dragging && !coasting &&
                         (idleMs > WorldMapState.IDLE_BEFORE_AUTO_MS || !interactive)
                     ) {
                         state.autoSpeed = min(
@@ -146,11 +166,15 @@ fun WorldMap(
                     awaitFirstDown(requireUnconsumed = false)
                     state.dragging = true
                     state.flingVelocity = 0f
+                    state.flatVelX = 0f
+                    state.flatVelY = 0f
                     state.noteInteraction(SystemClock.uptimeMillis())
                     var travelled = 0f
                     var tracking = false
                     var lastMs = SystemClock.uptimeMillis()
                     var velocityEma = 0f
+                    var flatVelXEma = 0f
+                    var flatVelYEma = 0f
                     while (true) {
                         val event = awaitPointerEvent()
                         if (event.changes.none { it.pressed }) break
@@ -188,13 +212,19 @@ fun WorldMap(
                             state.centerLon -= pan.x / s
                             state.centerLat += pan.y / s
                             state.clampCamera(w, h)
+                            flatVelXEma = flatVelXEma * 0.7f + (pan.x / dtMs * 1000f) * 0.3f
+                            flatVelYEma = flatVelYEma * 0.7f + (pan.y / dtMs * 1000f) * 0.3f
                         }
                         event.changes.forEach { if (it.positionChanged()) it.consume() }
                         state.noteInteraction(now)
                     }
                     state.dragging = false
-                    if (state.morph.value > 0.5f && abs(velocityEma) > 5f) {
-                        state.flingVelocity = velocityEma
+                    if (state.morph.value > 0.5f) {
+                        if (abs(velocityEma) > 5f) state.flingVelocity = velocityEma
+                    } else {
+                        // Let the pan glide on with the finger's momentum.
+                        state.flatVelX = flatVelXEma
+                        state.flatVelY = flatVelYEma
                     }
                     state.noteInteraction(SystemClock.uptimeMillis())
                 }
@@ -202,19 +232,24 @@ fun WorldMap(
             .pointerInput(onCountryTap == null) {
                 detectTapGestures(
                     onDoubleTap = { offset ->
-                        // Double tap: zoom the flat map in (or reset from max).
+                        // Double tap: spring the flat map in (or back out from max).
                         if (state.morph.value <= 0.05f && canvasSize.width > 0f) {
                             val w = canvasSize.width
                             val h = canvasSize.height
                             val sOld = MapProjection.flatScale(w, h, state.zoom)
                             val geoLon = state.centerLon + (offset.x - w / 2f) / sOld
                             val geoLat = state.centerLat - (offset.y - h / 2f) / sOld
-                            state.zoom = if (state.zoom > 5.5f) 1f else state.zoom * 2.2f
-                            state.clampCamera(w, h)
-                            val sNew = MapProjection.flatScale(w, h, state.zoom)
-                            state.centerLon = geoLon - (offset.x - w / 2f) / sNew
-                            state.centerLat = geoLat + (offset.y - h / 2f) / sNew
-                            state.clampCamera(w, h)
+                            val targetZoom = if (state.zoom > 5.5f) 1f else state.zoom * 2.2f
+                            scope.launch {
+                                val fromZoom = state.zoom
+                                animate(0f, 1f, animationSpec = Springs.Smooth) { t, _ ->
+                                    state.zoom = fromZoom + (targetZoom.coerceIn(1f, WorldMapState.MAX_ZOOM) - fromZoom) * t
+                                    val s = MapProjection.flatScale(w, h, state.zoom)
+                                    state.centerLon = geoLon - (offset.x - w / 2f) / s
+                                    state.centerLat = geoLat + (offset.y - h / 2f) / s
+                                    state.clampCamera(w, h)
+                                }
+                            }
                         }
                     },
                 ) { offset ->

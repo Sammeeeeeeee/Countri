@@ -3,6 +3,7 @@ package dev.sam.countri.data.db
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.Query
+import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -12,6 +13,9 @@ interface VisitDao {
 
     @Insert
     suspend fun insert(visit: VisitEntity): Long
+
+    @Update
+    suspend fun update(visit: VisitEntity)
 
     @Query("DELETE FROM visit WHERE id = :id")
     suspend fun delete(id: Long)

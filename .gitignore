@@ -1,6 +1,8 @@
 .gradle/
 build/
 local.properties
+keystore/
+keystore.properties
 *.apk
 *.aab
 .kotlin/

@@ -87,6 +87,24 @@ class AtlasRepository(
         }
     }
 
+    suspend fun updateVisit(
+        id: Long,
+        iso2: String,
+        start: LocalDate,
+        end: LocalDate,
+        cities: List<String>,
+    ) {
+        visitDao.update(
+            VisitEntity(
+                id = id,
+                iso2 = iso2,
+                startDay = start.toEpochDay(),
+                endDay = end.toEpochDay(),
+                cities = cities.map { it.trim() }.filter { it.isNotEmpty() },
+            )
+        )
+    }
+
     suspend fun deleteVisit(id: Long) = visitDao.delete(id)
 
     suspend fun updateDetails(

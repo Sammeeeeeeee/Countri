@@ -43,6 +43,12 @@ class WorldMapState(initialMode: MapMode) {
     private fun clampCentered(v: Float, min: Float, max: Float, fallback: Float): Float =
         if (min > max) fallback else v.coerceIn(min, max)
 
+    /** Flat-map pan inertia, px/second. */
+    var flatVelX by mutableFloatStateOf(0f)
+    var flatVelY by mutableFloatStateOf(0f)
+
+    val flatFlinging: Boolean get() = kotlin.math.abs(flatVelX) + kotlin.math.abs(flatVelY) > 30f
+
     // ---- globe ----
     var rotationDeg by mutableFloatStateOf(INITIAL_ROTATION)
 

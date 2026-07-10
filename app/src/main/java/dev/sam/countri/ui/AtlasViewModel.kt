@@ -88,6 +88,10 @@ class AtlasViewModel(
         }
     }
 
+    fun updateVisit(id: Long, iso2: String, start: LocalDate, end: LocalDate, visitCities: List<String>) {
+        viewModelScope.launch { repository.updateVisit(id, iso2, start, end, visitCities) }
+    }
+
     fun deleteVisit(id: Long) {
         viewModelScope.launch { repository.deleteVisit(id) }
     }

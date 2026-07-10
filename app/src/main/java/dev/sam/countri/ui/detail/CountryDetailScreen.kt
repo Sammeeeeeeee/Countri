@@ -69,6 +69,7 @@ fun CountryDetailScreen(
     var confirmClear by remember { mutableStateOf(false) }
     var editTarget by remember { mutableStateOf<EditTarget?>(null) }
     var showAddVisit by remember { mutableStateOf(false) }
+    var editVisit by remember { mutableStateOf<dev.sam.countri.domain.Visit?>(null) }
 
     val continentHue = palette.continentColor(entry.country.continent)
     val accent = when (entry.status) {
@@ -196,6 +197,7 @@ fun CountryDetailScreen(
                             VisitCard(
                                 visit = visit,
                                 accent = continentHue,
+                                onClick = { editVisit = visit },
                                 onDelete = {
                                     haptics.reject()
                                     viewModel.deleteVisit(visit.id)
@@ -340,6 +342,19 @@ fun CountryDetailScreen(
         )
     }
 
+    editVisit?.let { visit ->
+        AddVisitSheet(
+            entry = entry,
+            cityData = viewModel.cities,
+            existing = visit,
+            onDismiss = { editVisit = null },
+            onSave = { start, end, visitCities ->
+                viewModel.updateVisit(visit.id, iso2, start, end, visitCities)
+                editVisit = null
+            },
+        )
+    }
+
     editTarget?.let { target ->
         DetailEditSheet(
             target = target,
@@ -397,6 +412,7 @@ fun CountryDetailScreen(
 private fun VisitCard(
     visit: dev.sam.countri.domain.Visit,
     accent: Color,
+    onClick: () -> Unit,
     onDelete: () -> Unit,
 ) {
     val palette = Countri.palette
@@ -404,8 +420,14 @@ private fun VisitCard(
     Column(
         Modifier
             .fillMaxWidth()
+            .pressScale(0.98f)
             .clip(RoundedCornerShape(20.dp))
             .background(palette.surface1)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onClick,
+            )
             .padding(14.dp)
     ) {
         Row(
