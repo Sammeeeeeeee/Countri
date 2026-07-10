@@ -16,6 +16,8 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -28,6 +30,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -96,6 +99,12 @@ fun AddVisitSheet(
         draft = ""
     }
 
+    val sheetScroll = rememberScrollState()
+    // Keep the city suggestions visible above the keyboard.
+    LaunchedEffect(suggestions.size) {
+        if (suggestions.isNotEmpty()) sheetScroll.animateScrollTo(sheetScroll.maxValue)
+    }
+
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         containerColor = palette.surface2,
@@ -105,6 +114,7 @@ fun AddVisitSheet(
         Column(
             Modifier
                 .fillMaxWidth()
+                .verticalScroll(sheetScroll)
                 .padding(horizontal = 22.dp)
                 .padding(bottom = 26.dp)
                 .imePadding()
@@ -132,7 +142,6 @@ fun AddVisitSheet(
                         .pressScale(0.97f)
                         .clip(RoundedCornerShape(16.dp))
                         .background(palette.surface1)
-                        .hairline(RoundedCornerShape(16.dp))
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null,
@@ -177,7 +186,6 @@ fun AddVisitSheet(
                             modifier = Modifier
                                 .clip(CircleShape)
                                 .background(palette.surface1)
-                                .hairline(CircleShape, accent.copy(alpha = 0.3f))
                                 .padding(start = 14.dp, end = 8.dp, top = 7.dp, bottom = 7.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
@@ -208,7 +216,6 @@ fun AddVisitSheet(
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(16.dp))
                     .background(palette.surface1)
-                    .hairline(RoundedCornerShape(16.dp))
                     .padding(14.dp),
                 decorationBox = { inner ->
                     Box {
@@ -230,7 +237,6 @@ fun AddVisitSheet(
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(16.dp))
                         .background(palette.surface1)
-                        .hairline(RoundedCornerShape(16.dp))
                 ) {
                     suggestions.forEach { city ->
                         Row(
@@ -321,7 +327,6 @@ private fun StepButton(glyph: String, onClick: () -> Unit) {
             .pressScale(0.9f)
             .clip(CircleShape)
             .background(palette.surface1)
-            .hairline(CircleShape)
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,

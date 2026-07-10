@@ -59,6 +59,7 @@ import kotlinx.coroutines.launch
 fun AddCountryScreen(
     viewModel: AtlasViewModel,
     onClose: () -> Unit,
+    onAdded: (String) -> Unit,
 ) {
     val palette = Countri.palette
     val haptics = LocalHaptics.current
@@ -128,8 +129,7 @@ fun AddCountryScreen(
                 .padding(horizontal = 22.dp)
                 .height(48.dp)
                 .clip(CircleShape)
-                .background(palette.surface1)
-                .hairline(CircleShape),
+                .background(palette.surface1),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
@@ -199,10 +199,10 @@ fun AddCountryScreen(
             onDismiss = { quickIso = null },
             onConfirm = { status ->
                 viewModel.setStatus(quickEntry.country.iso2, status)
-                viewModel.mapMode = MapMode.Flat
                 haptics.confirm()
                 quickIso = null
-                onClose()
+                // Land on the country's own page to add the details.
+                onAdded(quickEntry.country.iso2)
             },
         )
     }
@@ -387,7 +387,6 @@ private fun StatusChoice(
             .pressScale(0.96f)
             .clip(CircleShape)
             .background(bg)
-            .hairline(CircleShape)
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,

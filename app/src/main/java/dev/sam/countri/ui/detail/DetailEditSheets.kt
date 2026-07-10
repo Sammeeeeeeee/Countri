@@ -146,7 +146,6 @@ private fun YearEditor(entry: CountryWithState, onSave: (Int) -> Unit) {
                     .pressScale(0.93f)
                     .clip(CircleShape)
                     .background(if (isSelected) palette.visited else palette.surface1)
-                    .hairline(CircleShape)
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null,
@@ -209,7 +208,6 @@ private fun StepperButton(glyph: String, onClick: () -> Unit) {
             .pressScale(0.9f)
             .clip(CircleShape)
             .background(palette.surface1)
-            .hairline(CircleShape)
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
@@ -264,7 +262,6 @@ private fun PlacesEditor(entry: CountryWithState, onSave: (List<String>) -> Unit
                     modifier = Modifier
                         .clip(CircleShape)
                         .background(palette.surface1)
-                        .hairline(CircleShape, accent.copy(alpha = 0.25f))
                         .padding(start = 14.dp, end = 8.dp, top = 7.dp, bottom = 7.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -299,7 +296,6 @@ private fun PlacesEditor(entry: CountryWithState, onSave: (List<String>) -> Unit
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
             .background(palette.surface1)
-            .hairline(RoundedCornerShape(16.dp))
             .padding(14.dp),
         decorationBox = { inner ->
             Box {
@@ -323,7 +319,6 @@ private fun PlacesEditor(entry: CountryWithState, onSave: (List<String>) -> Unit
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(16.dp))
                 .background(palette.surface1)
-                .hairline(RoundedCornerShape(16.dp))
         ) {
             suggestions.forEach { suggestion ->
                 Row(

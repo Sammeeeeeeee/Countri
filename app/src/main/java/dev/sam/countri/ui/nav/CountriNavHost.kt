@@ -157,6 +157,11 @@ fun CountriNavHost(
             AddCountryScreen(
                 viewModel = viewModel,
                 onClose = { navController.popBackStack() },
+                onAdded = { iso ->
+                    navController.navigate(DetailRoute(iso)) {
+                        popUpTo<AddRoute> { inclusive = true }
+                    }
+                },
             )
         }
         composable<DetailRoute>(

@@ -50,13 +50,6 @@ fun CountrySilhouette(
     val fillPaint = remember {
         Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
     }
-    val strokePaint = remember {
-        Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            style = Paint.Style.STROKE
-            strokeJoin = Paint.Join.ROUND
-        }
-    }
-    val haloPaint = remember { Paint(Paint.ANTI_ALIAS_FLAG) }
     val dotPaint = remember { Paint(Paint.ANTI_ALIAS_FLAG) }
     val labelPaint = remember { Paint(Paint.ANTI_ALIAS_FLAG) }
     val drawPath = remember { Path() }
@@ -85,31 +78,16 @@ fun CountrySilhouette(
 
         val alpha = entrance.value
 
-        // Halo behind the shape.
-        haloPaint.color = hue.toArgb()
-        haloPaint.alpha = (26 * alpha).toInt()
-        canvas.drawCircle(w / 2f, h / 2f, minOf(w, h) * 0.46f, haloPaint)
-
+        // Solid ink shape on clean canvas — no halo, no outline noise.
         fillPaint.color = hue.toArgb()
-        fillPaint.alpha = ((if (palette.isDark) 116 else 92) * alpha).toInt()
+        fillPaint.alpha = (243 * alpha).toInt()
         canvas.drawPath(drawPath, fillPaint)
 
-        if (palette.isDark) {
-            strokePaint.color = hue.toArgb()
-            strokePaint.strokeWidth = 5f * density
-            strokePaint.alpha = (46 * alpha).toInt()
-            canvas.drawPath(drawPath, strokePaint)
-        }
-        strokePaint.color = hue.toArgb()
-        strokePaint.strokeWidth = 1.6f * density
-        strokePaint.alpha = (235 * alpha).toInt()
-        canvas.drawPath(drawPath, strokePaint)
-
-        // ---- visited cities as labeled pins ----
+        // ---- visited cities as pins: canvas-colored holes in the ink ----
         if (cityMarkers.isNotEmpty()) {
             labelPaint.textSize = 10.5f * density
-            labelPaint.color = palette.textPrimary.toArgb()
-            labelPaint.alpha = (230 * alpha).toInt()
+            labelPaint.color = palette.textFaint.toArgb()
+            labelPaint.alpha = (255 * alpha).toInt()
             cityMarkers.forEach { marker ->
                 point[0] = marker.lon * geometry.lonScale
                 point[1] = -marker.lat
@@ -118,11 +96,8 @@ fun CountrySilhouette(
                 val py = point[1]
                 dotPaint.color = palette.canvas.toArgb()
                 dotPaint.alpha = (255 * alpha).toInt()
-                canvas.drawCircle(px, py, 4.6f * density, dotPaint)
-                dotPaint.color = palette.textPrimary.toArgb()
-                dotPaint.alpha = (255 * alpha).toInt()
-                canvas.drawCircle(px, py, 3f * density, dotPaint)
-                canvas.drawText(marker.name, px + 7f * density, py + 3.5f * density, labelPaint)
+                canvas.drawCircle(px, py, 3.4f * density, dotPaint)
+                canvas.drawText(marker.name, px + 6.5f * density, py + 3.5f * density, labelPaint)
             }
         }
     }
@@ -130,25 +105,64 @@ fun CountrySilhouette(
 
 private class CountryGeometry(val path: Path, val bounds: RectF, val lonScale: Float)
 
+private class RingInfo(
+    val ring: Int,
+    val centerLon: Float,
+    val centerLat: Float,
+    val span: Float,
+)
+
 private fun buildGeometry(data: WorldMapData, index: Int): CountryGeometry? {
     if (index <= 0) return null
-    // Dateline check: if the raw bbox spans most of the world, shift
-    // negative longitudes east so Russia/Fiji/NZ don't smear across.
-    var minLon = Float.MAX_VALUE
-    var maxLon = -Float.MAX_VALUE
-    var minLat = Float.MAX_VALUE
-    var maxLat = -Float.MAX_VALUE
+
+    // Gather this country's rings with their bounds.
+    val rings = ArrayList<RingInfo>()
+    var globalMinLon = Float.MAX_VALUE
+    var globalMaxLon = -Float.MAX_VALUE
     for (r in 0 until data.ringCount) {
         if (data.ringCountry[r] != index) continue
+        var minLon = Float.MAX_VALUE; var maxLon = -Float.MAX_VALUE
+        var minLat = Float.MAX_VALUE; var maxLat = -Float.MAX_VALUE
         for (i in data.ringStart[r] until data.ringStart[r] + data.ringSize[r]) {
             if (data.lon[i] < minLon) minLon = data.lon[i]
             if (data.lon[i] > maxLon) maxLon = data.lon[i]
             if (data.lat[i] < minLat) minLat = data.lat[i]
             if (data.lat[i] > maxLat) maxLat = data.lat[i]
         }
+        if (minLon > maxLon) continue
+        rings.add(
+            RingInfo(
+                ring = r,
+                centerLon = (minLon + maxLon) / 2f,
+                centerLat = (minLat + maxLat) / 2f,
+                span = maxOf(maxLon - minLon, maxLat - minLat),
+            )
+        )
+        if (minLon < globalMinLon) globalMinLon = minLon
+        if (maxLon > globalMaxLon) globalMaxLon = maxLon
     }
-    if (minLon > maxLon) return null
-    val wrap = maxLon - minLon > 180f
+    if (rings.isEmpty()) return null
+    val wrap = globalMaxLon - globalMinLon > 180f
+    fun unwrap(lon: Float) = if (wrap && lon < 0f) lon + 360f else lon
+
+    // The hero shows the recognizable mainland: keep the biggest landmass
+    // and anything near it (Corsica yes, French Guiana no).
+    val main = rings.maxBy { it.span }
+    val reach = maxOf(main.span * 1.6f, 14f)
+    val kept = rings.filter { info ->
+        val dLon = unwrap(info.centerLon) - unwrap(main.centerLon)
+        val dLat = info.centerLat - main.centerLat
+        dLon * dLon + dLat * dLat <= reach * reach
+    }
+
+    var minLat = Float.MAX_VALUE
+    var maxLat = -Float.MAX_VALUE
+    kept.forEach { info ->
+        for (i in data.ringStart[info.ring] until data.ringStart[info.ring] + data.ringSize[info.ring]) {
+            if (data.lat[i] < minLat) minLat = data.lat[i]
+            if (data.lat[i] > maxLat) maxLat = data.lat[i]
+        }
+    }
 
     // Equirectangular squashes east-west away from the equator; scale x by
     // cos(mid-latitude) so shapes keep their familiar proportions.
@@ -157,15 +171,12 @@ private fun buildGeometry(data: WorldMapData, index: Int): CountryGeometry? {
     ).toFloat().coerceAtLeast(0.2f)
 
     val path = Path().apply { fillType = Path.FillType.EVEN_ODD }
-    for (r in 0 until data.ringCount) {
-        if (data.ringCountry[r] != index) continue
-        val start = data.ringStart[r]
-        val size = data.ringSize[r]
+    kept.forEach { info ->
+        val start = data.ringStart[info.ring]
+        val size = data.ringSize[info.ring]
         for (k in 0 until size) {
             val i = start + k
-            var lon = data.lon[i]
-            if (wrap && lon < 0f) lon += 360f
-            val x = lon * lonScale
+            val x = unwrap(data.lon[i]) * lonScale
             val y = -data.lat[i]
             if (k == 0) path.moveTo(x, y) else path.lineTo(x, y)
         }

@@ -110,8 +110,7 @@ fun CountryDetailScreen(
                     .size(38.dp)
                     .pressScale(0.9f)
                     .clip(RoundedCornerShape(12.dp))
-                    .background(palette.surface1.copy(alpha = 0.85f))
-                    .hairline(RoundedCornerShape(12.dp))
+                    .background(palette.surface1.copy(alpha = 0.92f))
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null,
@@ -230,7 +229,6 @@ fun CountryDetailScreen(
                                 .pressScale(0.96f)
                                 .clip(CircleShape)
                                 .background(palette.surface1)
-                                .hairline(CircleShape, continentHue.copy(alpha = 0.25f))
                                 .clickable(
                                     interactionSource = remember { MutableInteractionSource() },
                                     indication = null,
@@ -257,11 +255,11 @@ fun CountryDetailScreen(
                     Text(
                         "+ Add",
                         style = CountriType.bodySmall,
-                        color = continentHue,
+                        color = palette.textPrimary,
                         modifier = Modifier
                             .pressScale(0.94f)
                             .clip(CircleShape)
-                            .hairline(CircleShape, continentHue.copy(alpha = 0.35f))
+                            .background(palette.surface1)
                             .clickable(
                                 interactionSource = remember { MutableInteractionSource() },
                                 indication = null,
@@ -271,7 +269,7 @@ fun CountryDetailScreen(
                 }
             }
 
-            // ---- Actions ----
+            // ---- Actions: filled ink primary, mist secondary ----
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -280,21 +278,22 @@ fun CountryDetailScreen(
             ) {
                 ActionButton(
                     text = if (entry.isVisited) "+ Add visit" else "Visited",
-                    accent = continentHue,
-                    selected = entry.isVisited,
+                    primary = true,
                     modifier = Modifier.weight(1f),
                 ) {
                     haptics.tick()
                     showAddVisit = true
                 }
-                ActionButton(
-                    text = "Wishlist",
-                    accent = palette.wishlist,
-                    selected = entry.isWishlist,
-                    modifier = Modifier.weight(1f),
-                ) {
-                    haptics.confirm()
-                    viewModel.setStatus(iso2, CountryStatus.WISHLIST)
+                // A country with recorded trips can't go back to dreaming.
+                if (entry.visits.isEmpty()) {
+                    ActionButton(
+                        text = "Wishlist",
+                        primary = false,
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        haptics.confirm()
+                        viewModel.setStatus(iso2, CountryStatus.WISHLIST)
+                    }
                 }
                 if (entry.status != null) {
                     Box(
@@ -302,7 +301,7 @@ fun CountryDetailScreen(
                             .size(width = 52.dp, height = 50.dp)
                             .pressScale(0.94f)
                             .clip(CircleShape)
-                            .hairline(CircleShape)
+                            .background(palette.surface1)
                             .clickable(
                                 interactionSource = remember { MutableInteractionSource() },
                                 indication = null,
@@ -407,7 +406,6 @@ private fun VisitCard(
             .fillMaxWidth()
             .clip(RoundedCornerShape(20.dp))
             .background(palette.surface1)
-            .hairline(RoundedCornerShape(20.dp))
             .padding(14.dp)
     ) {
         Row(
@@ -427,20 +425,26 @@ private fun VisitCard(
                     modifier = Modifier.padding(top = 3.dp),
                 )
             }
-            Icon(
-                CountriIcons.Close,
-                contentDescription = "Delete visit",
-                tint = palette.textFaint,
+            Box(
                 modifier = Modifier
-                    .size(24.dp)
+                    .size(32.dp)
+                    .pressScale(0.88f)
                     .clip(CircleShape)
+                    .background(palette.surface2)
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null,
                         onClick = onDelete,
-                    )
-                    .padding(5.dp),
-            )
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    CountriIcons.Close,
+                    contentDescription = "Delete visit",
+                    tint = palette.textSecondary,
+                    modifier = Modifier.size(14.dp),
+                )
+            }
         }
         if (visit.cities.isNotEmpty()) {
             Text(
@@ -467,7 +471,6 @@ private fun StatCard(
             .pressScale(0.97f)
             .clip(RoundedCornerShape(20.dp))
             .background(palette.surface1)
-            .hairline(RoundedCornerShape(20.dp))
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
@@ -492,18 +495,17 @@ private fun StatCard(
 @Composable
 private fun ActionButton(
     text: String,
-    accent: Color,
-    selected: Boolean,
+    primary: Boolean,
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
+    val palette = Countri.palette
     Box(
         modifier = modifier
             .height(50.dp)
             .pressScale(0.96f)
             .clip(CircleShape)
-            .background(if (selected) accent.copy(alpha = 0.16f) else Color.Transparent)
-            .hairline(CircleShape, accent.copy(alpha = if (selected) 0.5f else 0.25f))
+            .background(if (primary) palette.visited else palette.surface1)
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
@@ -511,6 +513,10 @@ private fun ActionButton(
             ),
         contentAlignment = Alignment.Center,
     ) {
-        Text(text, style = CountriType.body, color = accent)
+        Text(
+            text,
+            style = CountriType.body.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.W600),
+            color = if (primary) palette.onVisited else palette.textPrimary,
+        )
     }
 }

@@ -27,9 +27,13 @@ class AtlasRepository(
             val visitsByIso = visitRows.groupBy { it.iso2 }
             CountryCatalog.all.map { country ->
                 val row = byIso[country.iso2]
+                val hasVisits = visitsByIso.containsKey(country.iso2)
                 CountryWithState(
                     country = country,
-                    status = row?.status?.let {
+                    // Recorded trips outrank any stored status: a country
+                    // with visits can never demote to wishlist.
+                    status = if (hasVisits) CountryStatus.VISITED
+                    else row?.status?.let {
                         runCatching { CountryStatus.valueOf(it) }.getOrNull()
                     },
                     firstVisitYear = row?.firstVisitYear,

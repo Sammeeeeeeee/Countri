@@ -34,62 +34,28 @@ fun flagEmoji(iso2: String): String {
 }
 
 /**
- * Rounded-square flag badge — the app's monogram of a country.
- * Visited badges wear their continent's hue; wishlist ones a dashed border.
+ * Revolut-style country avatar: a quiet mist circle with the flag inside.
+ * No borders, no tints — status lives in the row's text, not its badge.
  */
 @Composable
 fun CodeBadge(
     iso2: String,
     status: CountryStatus?,
     modifier: Modifier = Modifier,
-    size: Dp = 38.dp,
+    size: Dp = 40.dp,
 ) {
     val palette = Countri.palette
-    val continentHue = CountryCatalog.byIso2[iso2]
-        ?.let { palette.continentColor(it.continent) }
-        ?: palette.visited
-    val accent = when (status) {
-        CountryStatus.VISITED -> continentHue
-        CountryStatus.WISHLIST -> palette.wishlist
-        null -> palette.textFaint
-    }
-    val fill = when (status) {
-        CountryStatus.VISITED -> continentHue.copy(alpha = 0.16f)
-        CountryStatus.WISHLIST -> Color.Transparent
-        null -> Color.Transparent
-    }
-    val shape = RoundedCornerShape(11.dp)
-    val borderModifier = if (status == CountryStatus.WISHLIST) {
-        Modifier.dashedBorder(accent.copy(alpha = 0.6f), shape = 11.dp)
-    } else {
-        Modifier.border(1.dp, accent.copy(alpha = 0.4f), shape)
-    }
     Box(
         modifier = modifier
             .size(size)
-            .background(fill, shape)
-            .then(borderModifier),
+            .background(palette.surface1, CircleShape),
         contentAlignment = Alignment.Center,
     ) {
         Text(
             flagEmoji(iso2),
-            style = CountriType.body.copy(fontSize = (size.value * 0.48f).sp),
+            style = CountriType.body.copy(fontSize = (size.value * 0.46f).sp),
         )
     }
-}
-
-/** 1dp dashed rounded-rect border — the wishlist signature. */
-fun Modifier.dashedBorder(color: Color, shape: Dp): Modifier = drawBehind {
-    drawRoundRect(
-        color = color,
-        cornerRadius = CornerRadius(shape.toPx()),
-        style = Stroke(
-            width = 1.2.dp.toPx(),
-            pathEffect = PathEffect.dashPathEffect(
-                floatArrayOf(4.dp.toPx(), 3.dp.toPx()),
-            ),
-        ),
-    )
 }
 
 /** Tracked-out mono section label: RECENT JOURNEYS, BY CONTINENT... */
@@ -103,13 +69,13 @@ fun SectionLabel(text: String, modifier: Modifier = Modifier) {
     )
 }
 
-/** Outlined pill: VISITED / ON THE WISHLIST / SOMEDAY. */
+/** Revolut badge: mist pill, no outline. VISITED / ON THE WISHLIST / SOMEDAY. */
 @Composable
 fun StatusPill(text: String, accent: Color, modifier: Modifier = Modifier) {
     Row(
         modifier = modifier
-            .border(1.dp, accent.copy(alpha = 0.4f), CircleShape)
-            .padding(horizontal = 11.dp, vertical = 4.dp),
+            .background(Countri.palette.surface1, CircleShape)
+            .padding(horizontal = 12.dp, vertical = 5.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(text.uppercase(), style = CountriType.monoSmall, color = accent)

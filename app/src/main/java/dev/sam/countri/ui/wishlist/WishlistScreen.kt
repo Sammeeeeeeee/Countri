@@ -103,11 +103,6 @@ fun WishlistScreen(
                             .pressScale(0.98f)
                             .clip(RoundedCornerShape(20.dp))
                             .background(palette.surface1)
-                            .border(
-                                1.dp,
-                                palette.wishlist.copy(alpha = 0.18f),
-                                RoundedCornerShape(20.dp),
-                            )
                             .clickable(
                                 interactionSource = remember { MutableInteractionSource() },
                                 indication = null,
@@ -119,7 +114,7 @@ fun WishlistScreen(
                         Box(
                             modifier = Modifier
                                 .size(46.dp)
-                                .border(1.5.dp, palette.wishlist.copy(alpha = 0.5f), CircleShape),
+                                .background(palette.surface2, CircleShape),
                             contentAlignment = Alignment.Center,
                         ) {
                             Text(

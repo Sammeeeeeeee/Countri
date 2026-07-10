@@ -231,7 +231,6 @@ private fun ModeToggle(mode: MapMode, onMode: (MapMode) -> Unit) {
         Modifier
             .clip(CircleShape)
             .background(palette.surface1)
-            .hairline(CircleShape)
             .padding(3.dp)
     ) {
         ToggleChip("Flat", mode == MapMode.Flat) { onMode(MapMode.Flat) }
