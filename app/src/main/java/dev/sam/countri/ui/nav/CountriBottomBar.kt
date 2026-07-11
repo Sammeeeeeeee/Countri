@@ -27,6 +27,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import dev.sam.countri.ui.components.CountriIcons
@@ -46,16 +47,21 @@ fun CountriBottomBar(
     current: CountriTab?,
     onTab: (CountriTab) -> Unit,
     onAdd: () -> Unit,
+    /** Painted behind the FAB-overlap strip so the screen above (e.g. the
+     *  Atlas recent-journeys panel) reads as one surface down to the bar. */
+    topStripColor: Color = Color.Transparent,
 ) {
     val palette = Countri.palette
     val haptics = LocalHaptics.current
 
     Box {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 18.dp) // room for the FAB overlap
-        ) {
+        Column(Modifier.fillMaxWidth()) {
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(18.dp) // room for the FAB overlap
+                    .background(topStripColor)
+            )
             Row(
                 modifier = Modifier
                     .fillMaxWidth()

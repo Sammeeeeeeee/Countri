@@ -66,6 +66,12 @@ fun CountriRoot(startAtOnboarding: Boolean = false) {
                     current = currentTab,
                     onTab = { tab -> navController.navigateToTab(tab) },
                     onAdd = { navController.navigate(AddRoute) },
+                    // On the Atlas the recent-journeys panel runs into the bar.
+                    topStripColor = if (currentTab == CountriTab.Atlas) {
+                        Countri.palette.surface1
+                    } else {
+                        androidx.compose.ui.graphics.Color.Transparent
+                    },
                 )
             }
         },
