@@ -219,7 +219,8 @@ private fun CountryRow(
         modifier = modifier
             .fillMaxWidth()
             .pressScale(0.98f)
-            .clip(RoundedCornerShape(13.dp))
+            .clip(RoundedCornerShape(16.dp))
+            .background(palette.surface1)
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
@@ -374,7 +375,7 @@ private fun StatusChoice(
 ) {
     val palette = Countri.palette
     val bg by animateColorAsState(
-        targetValue = if (selected) accent else palette.surface1,
+        targetValue = if (selected) accent else palette.recessed,
         label = "choiceBg",
     )
     val fg by animateColorAsState(

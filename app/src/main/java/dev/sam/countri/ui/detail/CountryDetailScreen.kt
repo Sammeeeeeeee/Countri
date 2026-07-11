@@ -49,6 +49,8 @@ import dev.sam.countri.ui.components.StatusPill
 import dev.sam.countri.ui.components.flagEmoji
 import dev.sam.countri.ui.map.CityMarker
 import dev.sam.countri.ui.map.CountrySilhouette
+import dev.sam.countri.ui.share.VisitCardRenderer
+import dev.sam.countri.ui.share.shareBitmap
 import dev.sam.countri.ui.theme.Countri
 import dev.sam.countri.ui.theme.CountriType
 import dev.sam.countri.ui.theme.hairline
@@ -198,6 +200,15 @@ fun CountryDetailScreen(
                                 visit = visit,
                                 accent = continentHue,
                                 onClick = { editVisit = visit },
+                                onShare = {
+                                    haptics.tick()
+                                    shareBitmap(
+                                        context,
+                                        VisitCardRenderer.render(context, entry, visit),
+                                        "countri-visit.png",
+                                        "Share your trip",
+                                    )
+                                },
                                 onDelete = {
                                     haptics.reject()
                                     viewModel.deleteVisit(visit.id)
@@ -206,13 +217,6 @@ fun CountryDetailScreen(
                         }
                     }
                 }
-            } else if (entry.isWishlist) {
-                Text(
-                    "Still on the list.",
-                    style = CountriType.quote,
-                    color = palette.textPrimary.copy(alpha = 0.8f),
-                    modifier = Modifier.padding(top = 18.dp),
-                )
             }
 
             // ---- Places: things seen or worth seeing; tap one → Wikipedia ----
@@ -287,7 +291,7 @@ fun CountryDetailScreen(
                     showAddVisit = true
                 }
                 // A country with recorded trips can't go back to dreaming.
-                if (entry.visits.isEmpty()) {
+                if (entry.visits.isEmpty() && !entry.isWishlist) {
                     ActionButton(
                         text = "Wishlist",
                         primary = false,
@@ -413,6 +417,7 @@ private fun VisitCard(
     visit: dev.sam.countri.domain.Visit,
     accent: Color,
     onClick: () -> Unit,
+    onShare: () -> Unit,
     onDelete: () -> Unit,
 ) {
     val palette = Countri.palette
@@ -452,7 +457,28 @@ private fun VisitCard(
                     .size(32.dp)
                     .pressScale(0.88f)
                     .clip(CircleShape)
-                    .background(palette.surface2)
+                    .background(palette.recessed)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = onShare,
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    CountriIcons.Share,
+                    contentDescription = "Share visit",
+                    tint = palette.textSecondary,
+                    modifier = Modifier.size(14.dp),
+                )
+            }
+            Box(
+                modifier = Modifier
+                    .padding(start = 8.dp)
+                    .size(32.dp)
+                    .pressScale(0.88f)
+                    .clip(CircleShape)
+                    .background(palette.recessed)
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null,

@@ -53,14 +53,14 @@ class StatsCalculatorTest {
     }
 
     @Test
-    fun `timeline groups by year ascending with fallback for missing years`() {
+    fun `timeline groups by year newest first with fallback for missing years`() {
         val stats = StatsCalculator.calculate(
             listOf(visited("FR", 2019), visited("ES", 2015), visited("JP", 2019), visited("BR", null)),
             fallbackYear = 2026,
         )
-        assertEquals(listOf(2015, 2019, 2026), stats.timeline.map { it.year })
+        assertEquals(listOf(2026, 2019, 2015), stats.timeline.map { it.year })
         assertEquals(listOf("FR", "JP"), stats.timeline[1].isoCodes)
-        assertEquals(listOf("BR"), stats.timeline[2].isoCodes)
+        assertEquals(listOf("BR"), stats.timeline[0].isoCodes)
     }
 
     @Test

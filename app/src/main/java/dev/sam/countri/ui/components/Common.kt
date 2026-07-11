@@ -48,7 +48,7 @@ fun CodeBadge(
     Box(
         modifier = modifier
             .size(size)
-            .background(palette.surface1, CircleShape),
+            .background(palette.recessed, CircleShape),
         contentAlignment = Alignment.Center,
     ) {
         Text(
@@ -74,7 +74,7 @@ fun SectionLabel(text: String, modifier: Modifier = Modifier) {
 fun StatusPill(text: String, accent: Color, modifier: Modifier = Modifier) {
     Row(
         modifier = modifier
-            .background(Countri.palette.surface1, CircleShape)
+            .background(Countri.palette.recessed, CircleShape)
             .padding(horizontal = 12.dp, vertical = 5.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {

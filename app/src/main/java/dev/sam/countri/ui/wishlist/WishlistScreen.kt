@@ -91,7 +91,7 @@ fun WishlistScreen(
         } else {
             LazyColumn(
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                    start = 18.dp, end = 18.dp, top = 14.dp, bottom = 24.dp,
+                    start = 18.dp, end = 18.dp, top = 14.dp, bottom = 110.dp,
                 ),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
@@ -114,7 +114,7 @@ fun WishlistScreen(
                         Box(
                             modifier = Modifier
                                 .size(46.dp)
-                                .background(palette.surface2, CircleShape),
+                                .background(palette.recessed, CircleShape),
                             contentAlignment = Alignment.Center,
                         ) {
                             Text(

@@ -22,6 +22,8 @@ class MapColors(palette: CountriPalette) {
     val wishlist = palette.wishlist.toArgb()
     val sphereCenter = palette.globeShade.toArgb()
     val sphereEdge = palette.canvas.copy(alpha = 0f).toArgb()
+    val label = palette.textPrimary.toArgb()
+    val labelHalo = palette.canvas.toArgb()
     /** Continent hues, ordinal-indexed — visited countries wear these. */
     val continents = IntArray(palette.continents.size) { palette.continents[it].toArgb() }
 }
@@ -64,6 +66,14 @@ class WorldMapRenderer(private val data: WorldMapData) {
     }
     private var dashScale = 0f
     private val spherePaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        textAlign = Paint.Align.CENTER
+    }
+    private val labelHaloPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        textAlign = Paint.Align.CENTER
+        style = Paint.Style.STROKE
+        strokeJoin = Paint.Join.ROUND
+    }
     private var sphereShaderKey = 0f
 
     fun draw(
@@ -187,6 +197,32 @@ class WorldMapRenderer(private val data: WorldMapData) {
             strokePaint.alpha = ((1f - pulseProgress) * 170).toInt()
             canvas.drawPath(paths[pulseIndex], strokePaint)
         }
+
+        // ---- country names fade in as the flat map zooms ----
+        if (morph <= 0.01f && viewport.zoom >= LABEL_MIN_ZOOM) {
+            val fade = ((viewport.zoom - LABEL_MIN_ZOOM) / 0.8f).coerceIn(0f, 1f)
+            val s = MapProjection.flatScale(w, h, viewport.zoom)
+            labelPaint.textSize = 11f * density
+            labelHaloPaint.textSize = 11f * density
+            labelHaloPaint.strokeWidth = 3f * density
+            labelPaint.color = colors.label
+            labelPaint.alpha = (fade * 235).toInt()
+            labelHaloPaint.color = colors.labelHalo
+            labelHaloPaint.alpha = (fade * 200).toInt()
+            val catalog = CountryCatalog.all
+            for (i in catalog.indices) {
+                val country = catalog[i]
+                val x = w / 2f + (country.lon - viewport.centerLon) * s
+                val y = h / 2f - (country.lat - viewport.centerLat) * s
+                if (x < -60f || x > w + 60f || y < -20f || y > h + 20f) continue
+                canvas.drawText(country.name, x, y, labelHaloPaint)
+                canvas.drawText(country.name, x, y, labelPaint)
+            }
+        }
+    }
+
+    private companion object {
+        const val LABEL_MIN_ZOOM = 2.3f
     }
 
     private fun continentHue(colors: MapColors, c: Int): Int {

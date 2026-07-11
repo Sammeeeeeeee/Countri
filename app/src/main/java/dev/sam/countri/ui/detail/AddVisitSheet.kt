@@ -134,7 +134,7 @@ fun AddVisitSheet(
                         Row(
                             modifier = Modifier
                                 .clip(CircleShape)
-                                .background(palette.surface1)
+                                .background(palette.recessed)
                                 .padding(start = 14.dp, end = 8.dp, top = 7.dp, bottom = 7.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
@@ -165,7 +165,7 @@ fun AddVisitSheet(
                     .padding(top = 10.dp)
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(16.dp))
-                    .background(palette.surface1)
+                    .background(palette.recessed)
                     .padding(14.dp),
                 decorationBox = { inner ->
                     Box {
@@ -186,7 +186,7 @@ fun AddVisitSheet(
                         .padding(top = 8.dp)
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(20.dp))
-                        .background(palette.surface1)
+                        .background(palette.recessed)
                 ) {
                     suggestions.take(4).forEach { city ->
                         Row(
@@ -230,7 +230,7 @@ fun AddVisitSheet(
                         .weight(1f)
                         .pressScale(0.97f)
                         .clip(RoundedCornerShape(16.dp))
-                        .background(palette.surface1)
+                        .background(palette.recessed)
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null,
@@ -326,7 +326,7 @@ private fun StepButton(glyph: String, onClick: () -> Unit) {
             .size(44.dp)
             .pressScale(0.9f)
             .clip(CircleShape)
-            .background(palette.surface1)
+            .background(palette.recessed)
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,

@@ -145,7 +145,7 @@ private fun YearEditor(entry: CountryWithState, onSave: (Int) -> Unit) {
                 modifier = Modifier
                     .pressScale(0.93f)
                     .clip(CircleShape)
-                    .background(if (isSelected) palette.visited else palette.surface1)
+                    .background(if (isSelected) palette.visited else palette.recessed)
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null,
@@ -207,7 +207,7 @@ private fun StepperButton(glyph: String, onClick: () -> Unit) {
             .size(52.dp)
             .pressScale(0.9f)
             .clip(CircleShape)
-            .background(palette.surface1)
+            .background(palette.recessed)
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
@@ -261,7 +261,7 @@ private fun PlacesEditor(entry: CountryWithState, onSave: (List<String>) -> Unit
                 Row(
                     modifier = Modifier
                         .clip(CircleShape)
-                        .background(palette.surface1)
+                        .background(palette.recessed)
                         .padding(start = 14.dp, end = 8.dp, top = 7.dp, bottom = 7.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -295,7 +295,7 @@ private fun PlacesEditor(entry: CountryWithState, onSave: (List<String>) -> Unit
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
-            .background(palette.surface1)
+            .background(palette.recessed)
             .padding(14.dp),
         decorationBox = { inner ->
             Box {
@@ -318,7 +318,7 @@ private fun PlacesEditor(entry: CountryWithState, onSave: (List<String>) -> Unit
                 .padding(top = 8.dp)
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(16.dp))
-                .background(palette.surface1)
+                .background(palette.recessed)
         ) {
             suggestions.forEach { suggestion ->
                 Row(

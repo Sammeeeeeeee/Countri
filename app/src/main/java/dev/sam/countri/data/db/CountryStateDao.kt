@@ -13,6 +13,12 @@ interface CountryStateDao {
     @Upsert
     suspend fun upsert(state: CountryStateEntity)
 
+    @Query("SELECT * FROM country_state")
+    suspend fun allOnce(): List<CountryStateEntity>
+
     @Query("DELETE FROM country_state WHERE iso2 = :iso2")
     suspend fun delete(iso2: String)
+
+    @Query("DELETE FROM country_state")
+    suspend fun deleteAll()
 }

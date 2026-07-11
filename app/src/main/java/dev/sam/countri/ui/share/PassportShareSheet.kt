@@ -115,7 +115,7 @@ fun PassportShareSheet(
                                 .fillMaxWidth()
                                 .aspectRatio(1080f / 1350f)
                                 .clip(RoundedCornerShape(12.dp))
-                                .background(palette.surface1)
+                                .background(palette.recessed)
                                 .hairline(
                                     RoundedCornerShape(12.dp),
                                     if (selected == style) palette.visited

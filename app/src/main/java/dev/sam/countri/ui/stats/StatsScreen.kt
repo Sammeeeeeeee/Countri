@@ -1,10 +1,14 @@
 package dev.sam.countri.ui.stats
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,13 +22,16 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -34,18 +41,27 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.sam.countri.data.catalog.WORLD_COUNTRY_COUNT
 import dev.sam.countri.domain.AtlasStats
 import dev.sam.countri.ui.AtlasViewModel
+import dev.sam.countri.ui.components.CountriIcons
+import dev.sam.countri.ui.components.LocalHaptics
 import dev.sam.countri.ui.components.SectionLabel
 import dev.sam.countri.ui.components.flagEmoji
+import dev.sam.countri.ui.share.StatsCardRenderer
+import dev.sam.countri.ui.share.shareBitmap
 import dev.sam.countri.ui.theme.Countri
 import dev.sam.countri.ui.theme.CountriType
 import dev.sam.countri.ui.theme.MonoFamily
+import dev.sam.countri.ui.theme.pressScale
 import dev.sam.countri.ui.theme.staggeredEnter
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
 
 private val CountUpEasing = CubicBezierEasing(0.2f, 0.8f, 0.2f, 1f)
@@ -53,6 +69,9 @@ private val CountUpEasing = CubicBezierEasing(0.2f, 0.8f, 0.2f, 1f)
 @Composable
 fun StatsScreen(viewModel: AtlasViewModel) {
     val palette = Countri.palette
+    val haptics = LocalHaptics.current
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val stats by viewModel.stats.collectAsState()
 
     // One driver for every number on screen: they land together.
@@ -69,14 +88,50 @@ fun StatsScreen(viewModel: AtlasViewModel) {
             .statusBarsPadding()
             .verticalScroll(rememberScrollState())
     ) {
-        Column(Modifier.padding(horizontal = 22.dp).padding(top = 16.dp)) {
-            Text("Stats", style = CountriType.title, color = palette.textPrimary)
-            Text(
-                "The world, counted.",
-                style = CountriType.bodySmall,
-                color = palette.textSecondary,
-                modifier = Modifier.padding(top = 5.dp),
-            )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 22.dp)
+                .padding(top = 16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.Top,
+        ) {
+            Column {
+                Text("Stats", style = CountriType.title, color = palette.textPrimary)
+                Text(
+                    "The world, counted.",
+                    style = CountriType.bodySmall,
+                    color = palette.textSecondary,
+                    modifier = Modifier.padding(top = 5.dp),
+                )
+            }
+            Box(
+                modifier = Modifier
+                    .size(38.dp)
+                    .pressScale(0.9f)
+                    .clip(CircleShape)
+                    .background(palette.surface1)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                    ) {
+                        haptics.tick()
+                        shareBitmap(
+                            context,
+                            StatsCardRenderer.render(context, stats),
+                            "countri-stats.png",
+                            "Share your stats",
+                        )
+                    },
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    CountriIcons.Share,
+                    contentDescription = "Share stats",
+                    tint = palette.textSecondary,
+                    modifier = Modifier.size(18.dp),
+                )
+            }
         }
 
         // ---- Hero: ring + counters ----
@@ -251,7 +306,81 @@ fun StatsScreen(viewModel: AtlasViewModel) {
                 )
             }
         }
-        Box(Modifier.height(12.dp))
+        // ---- Data: export lands wherever the picker points (incl. Drive) ----
+        SectionLabel("Data", Modifier.padding(horizontal = 22.dp, vertical = 6.dp))
+        val exportLauncher = rememberLauncherForActivityResult(
+            ActivityResultContracts.CreateDocument("application/json")
+        ) { uri ->
+            if (uri != null) scope.launch {
+                val text = viewModel.exportBackup()
+                withContext(Dispatchers.IO) {
+                    context.contentResolver.openOutputStream(uri)?.use {
+                        it.write(text.toByteArray())
+                    }
+                }
+                haptics.confirm()
+            }
+        }
+        val importLauncher = rememberLauncherForActivityResult(
+            ActivityResultContracts.OpenDocument()
+        ) { uri ->
+            if (uri != null) scope.launch {
+                val text = withContext(Dispatchers.IO) {
+                    context.contentResolver.openInputStream(uri)?.bufferedReader()?.readText()
+                }
+                if (text != null && viewModel.importBackup(text)) haptics.confirm()
+                else haptics.reject()
+            }
+        }
+        Column(
+            Modifier
+                .padding(horizontal = 22.dp, vertical = 8.dp)
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(20.dp))
+                .background(palette.surface1)
+        ) {
+            DataRow("Back up", "Save everything as a file — Drive, anywhere") {
+                exportLauncher.launch("countri-backup.json")
+            }
+            DataRow("Restore", "Replace this atlas with a backup file") {
+                importLauncher.launch(arrayOf("application/json"))
+            }
+        }
+
+        Box(Modifier.height(110.dp))
+    }
+}
+
+@Composable
+private fun DataRow(title: String, subtitle: String, onClick: () -> Unit) {
+    val palette = Countri.palette
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .pressScale(0.98f)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onClick,
+            )
+            .padding(horizontal = 16.dp, vertical = 13.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(title, style = CountriType.body, color = palette.textPrimary)
+            Text(
+                subtitle,
+                style = CountriType.bodySmall,
+                color = palette.textFaint,
+                modifier = Modifier.padding(top = 1.dp),
+            )
+        }
+        Icon(
+            CountriIcons.Chevron,
+            contentDescription = null,
+            tint = palette.textFaint,
+            modifier = Modifier.size(16.dp),
+        )
     }
 }
 

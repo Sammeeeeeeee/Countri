@@ -123,6 +123,11 @@ class AtlasViewModel(
         viewModelScope.launch { onboardingPrefs.markSeen() }
     }
 
+    suspend fun exportBackup(): String = repository.exportBackup()
+
+    suspend fun importBackup(text: String): Boolean =
+        runCatching { repository.importBackup(text) }.isSuccess
+
     private fun pulse(iso2: String) {
         justAddedJob?.cancel()
         _justAdded.value = iso2

@@ -1,5 +1,6 @@
 package dev.sam.countri.data.repo
 
+import dev.sam.countri.data.backup.Backup
 import dev.sam.countri.data.catalog.CountryCatalog
 import dev.sam.countri.data.db.CountryStateDao
 import dev.sam.countri.data.db.CountryStateEntity
@@ -130,5 +131,32 @@ class AtlasRepository(
     suspend fun clear(iso2: String) {
         visitDao.deleteAllFor(iso2)
         dao.delete(iso2)
+    }
+
+    suspend fun exportBackup(): String =
+        Backup.encode(dao.allOnce(), visitDao.allOnce())
+
+    /** Replaces everything with the backup's contents. */
+    suspend fun importBackup(text: String) {
+        val data = Backup.decode(text)
+        dao.deleteAll()
+        visitDao.deleteAll()
+        data.states.forEach { s ->
+            dao.upsert(
+                CountryStateEntity(
+                    iso2 = s.iso2,
+                    status = s.status,
+                    firstVisitYear = s.firstVisitYear,
+                    note = s.note,
+                    tags = s.tags,
+                    trips = s.trips,
+                )
+            )
+        }
+        visitDao.insertAll(
+            data.visits.map { v ->
+                VisitEntity(iso2 = v.iso2, startDay = v.startDay, endDay = v.endDay, cities = v.cities)
+            }
+        )
     }
 }

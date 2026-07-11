@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -99,7 +100,7 @@ fun PassportScreen(
                     modifier = Modifier
                         .size(38.dp)
                         .pressScale(0.9f)
-                        .clip(RoundedCornerShape(12.dp))
+                        .clip(CircleShape)
                         .background(palette.surface1)
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },
@@ -142,7 +143,7 @@ fun PassportScreen(
             LazyVerticalGrid(
                 columns = GridCells.Fixed(3),
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                    start = 18.dp, end = 18.dp, top = 14.dp, bottom = 24.dp,
+                    start = 18.dp, end = 18.dp, top = 14.dp, bottom = 110.dp,
                 ),
                 horizontalArrangement = Arrangement.spacedBy(14.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp),

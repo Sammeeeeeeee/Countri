@@ -61,7 +61,7 @@ object StatsCalculator {
             }
             .groupBy({ it.first }, { it.second })
             .map { (year, entries) -> YearGroup(year, entries.sortedBy { it.iso2 }) }
-            .sortedBy { it.year }
+            .sortedByDescending { it.year }
         return AtlasStats(
             visitedCount = visited.size,
             wishlistCount = countries.count { it.isWishlist },

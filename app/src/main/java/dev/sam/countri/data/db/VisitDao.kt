@@ -14,8 +14,17 @@ interface VisitDao {
     @Insert
     suspend fun insert(visit: VisitEntity): Long
 
+    @Insert
+    suspend fun insertAll(visits: List<VisitEntity>)
+
     @Update
     suspend fun update(visit: VisitEntity)
+
+    @Query("SELECT * FROM visit")
+    suspend fun allOnce(): List<VisitEntity>
+
+    @Query("DELETE FROM visit")
+    suspend fun deleteAll()
 
     @Query("DELETE FROM visit WHERE id = :id")
     suspend fun delete(id: Long)

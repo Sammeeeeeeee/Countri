@@ -9,15 +9,23 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavHostController
@@ -54,38 +62,51 @@ fun CountriRoot(startAtOnboarding: Boolean = false) {
         else -> null
     }
 
-    Scaffold(
-        containerColor = Countri.palette.canvas,
-        bottomBar = {
-            AnimatedVisibility(
-                visible = currentTab != null,
-                enter = slideInVertically(Springs.SmoothOffset) { it } + fadeIn(),
-                exit = slideOutVertically(Springs.SmoothOffset) { it } + fadeOut(),
-            ) {
-                CountriBottomBar(
-                    current = currentTab,
-                    onTab = { tab -> navController.navigateToTab(tab) },
-                    onAdd = { navController.navigate(AddRoute) },
-                    // On the Atlas the recent-journeys panel runs into the bar.
-                    topStripColor = if (currentTab == CountriTab.Atlas) {
-                        Countri.palette.surface1
-                    } else {
-                        androidx.compose.ui.graphics.Color.Transparent
-                    },
-                )
+    // Revolut layout: content runs to the screen edge; the nav pill floats
+    // over it and minimizes when the content scrolls down.
+    var barMinimized by remember { mutableStateOf(false) }
+    val barScrollConnection = remember {
+        object : NestedScrollConnection {
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                if (available.y < -8f) barMinimized = true
+                else if (available.y > 8f) barMinimized = false
+                return Offset.Zero
             }
-        },
-    ) { padding ->
+        }
+    }
+    LaunchedEffect(currentTab) { barMinimized = false }
+
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(Countri.palette.canvas)
+    ) {
         CountriNavHost(
             navController = navController,
             viewModel = viewModel,
             startAtOnboarding = startAtOnboarding,
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding),
+                .nestedScroll(barScrollConnection),
         )
+        AnimatedVisibility(
+            visible = currentTab != null,
+            enter = slideInVertically(Springs.SmoothOffset) { it } + fadeIn(),
+            exit = slideOutVertically(Springs.SmoothOffset) { it } + fadeOut(),
+            modifier = Modifier.align(Alignment.BottomCenter),
+        ) {
+            CountriBottomBar(
+                current = currentTab,
+                minimized = barMinimized,
+                onTab = { tab -> navController.navigateToTab(tab) },
+                onAdd = { navController.navigate(AddRoute) },
+            )
+        }
     }
 }
+
+/** Bottom inset that keeps scrollable content clear of the floating pill. */
+val BarClearance = 108.dp
 
 private fun NavHostController.navigateToTab(tab: CountriTab) {
     val route: Any = when (tab) {

@@ -2,21 +2,21 @@ package dev.sam.countri.ui.nav
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -25,134 +25,195 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.sam.countri.ui.components.CountriIcons
 import dev.sam.countri.ui.components.LocalHaptics
 import dev.sam.countri.ui.theme.Countri
-import dev.sam.countri.ui.theme.Springs
+import dev.sam.countri.ui.theme.CountriType
 import dev.sam.countri.ui.theme.pressScale
 
 enum class CountriTab { Atlas, Passport, Stats, Wishlist }
 
 /**
- * Custom bottom bar: four line-icon tabs around a raised circular + button.
- * Flat surface, top hairline, no elevation — the FAB overlaps the bar edge.
+ * Revolut's floating nav: a white pill hovering above the bottom edge,
+ * five items inside, the active one sitting in a recessed highlight.
+ * Scrolling down minimizes it — labels collapse and the pill slims.
  */
 @Composable
 fun CountriBottomBar(
     current: CountriTab?,
+    minimized: Boolean,
     onTab: (CountriTab) -> Unit,
     onAdd: () -> Unit,
-    /** Painted behind the FAB-overlap strip so the screen above (e.g. the
-     *  Atlas recent-journeys panel) reads as one surface down to the bar. */
-    topStripColor: Color = Color.Transparent,
+    modifier: Modifier = Modifier,
 ) {
     val palette = Countri.palette
     val haptics = LocalHaptics.current
 
-    Box {
-        Column(Modifier.fillMaxWidth()) {
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .height(18.dp) // room for the FAB overlap
-                    .background(topStripColor)
-            )
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .drawBehind {
-                        drawRect(palette.canvas.copy(alpha = 0.97f))
-                        drawRect(palette.hairline, size = size.copy(height = 1.dp.toPx()))
-                    }
-                    .windowInsetsPadding(WindowInsets.navigationBars)
-                    .height(60.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                TabItem(CountriIcons.Atlas, "Atlas", current == CountriTab.Atlas, Modifier.weight(1f)) {
-                    haptics.tick(); onTab(CountriTab.Atlas)
-                }
-                TabItem(CountriIcons.Passport, "Passport", current == CountriTab.Passport, Modifier.weight(1f)) {
-                    haptics.tick(); onTab(CountriTab.Passport)
-                }
-                Box(Modifier.weight(1f)) // FAB well
-                TabItem(CountriIcons.Stats, "Stats", current == CountriTab.Stats, Modifier.weight(1f)) {
-                    haptics.tick(); onTab(CountriTab.Stats)
-                }
-                TabItem(CountriIcons.Wishlist, "Wishlist", current == CountriTab.Wishlist, Modifier.weight(1f)) {
-                    haptics.tick(); onTab(CountriTab.Wishlist)
-                }
-            }
-        }
+    val barHeight by animateDpAsState(
+        targetValue = if (minimized) 52.dp else 66.dp,
+        animationSpec = spring(dampingRatio = 0.85f, stiffness = 380f),
+        label = "barHeight",
+    )
+    val labelHeight by animateDpAsState(
+        targetValue = if (minimized) 0.dp else 14.dp,
+        animationSpec = spring(dampingRatio = 0.85f, stiffness = 380f),
+        label = "labelHeight",
+    )
+    val labelAlpha by animateFloatAsState(
+        targetValue = if (minimized) 0f else 1f,
+        animationSpec = spring(dampingRatio = 1f, stiffness = 500f),
+        label = "labelAlpha",
+    )
 
-        // Center + button, overlapping the bar's top edge.
-        Box(
+    Row(
+        modifier = modifier
+            .navigationBarsPadding()
+            .padding(horizontal = 14.dp)
+            .padding(bottom = 6.dp)
+            .fillMaxWidth()
+            .height(barHeight)
+            .shadow(
+                elevation = if (palette.isDark) 0.dp else 16.dp,
+                shape = CircleShape,
+                ambientColor = Color(0x2E000000),
+                spotColor = Color(0x2E000000),
+            )
+            .clip(CircleShape)
+            .background(palette.surface1)
+            .then(
+                if (palette.isDark) Modifier.border(1.dp, palette.hairline, CircleShape)
+                else Modifier
+            )
+            .padding(horizontal = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        BarItem(
+            icon = CountriIcons.Atlas,
+            label = "Atlas",
+            selected = current == CountriTab.Atlas,
+            labelHeight = labelHeight,
+            labelAlpha = labelAlpha,
+            modifier = Modifier.weight(1f),
+        ) { haptics.tick(); onTab(CountriTab.Atlas) }
+        BarItem(
+            icon = CountriIcons.Passport,
+            label = "Passport",
+            selected = current == CountriTab.Passport,
+            labelHeight = labelHeight,
+            labelAlpha = labelAlpha,
+            modifier = Modifier.weight(1f),
+        ) { haptics.tick(); onTab(CountriTab.Passport) }
+
+        // The + item: a filled ink coin, RevPoints-style.
+        Column(
             modifier = Modifier
-                .align(Alignment.TopCenter)
-                .size(56.dp)
-                .pressScale(0.92f)
-                .clip(CircleShape)
-                .background(palette.visited)
+                .weight(1f)
+                .pressScale(0.9f)
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null,
-                ) {
-                    haptics.tick()
-                    onAdd()
-                },
-            contentAlignment = Alignment.Center,
+                ) { haptics.tick(); onAdd() },
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Icon(
-                imageVector = CountriIcons.Plus,
-                contentDescription = "Add a country",
-                tint = palette.onVisited,
-                modifier = Modifier.size(26.dp),
+            Box(
+                modifier = Modifier
+                    .size(26.dp)
+                    .clip(CircleShape)
+                    .background(palette.visited),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    CountriIcons.Plus,
+                    contentDescription = "Add a country",
+                    tint = palette.onVisited,
+                    modifier = Modifier.size(15.dp),
+                )
+            }
+            Text(
+                "Add",
+                style = CountriType.monoSmall,
+                color = palette.textPrimary,
+                maxLines = 1,
+                modifier = Modifier
+                    .padding(top = 2.dp)
+                    .height(labelHeight)
+                    .alpha(labelAlpha),
             )
         }
+
+        BarItem(
+            icon = CountriIcons.Stats,
+            label = "Stats",
+            selected = current == CountriTab.Stats,
+            labelHeight = labelHeight,
+            labelAlpha = labelAlpha,
+            modifier = Modifier.weight(1f),
+        ) { haptics.tick(); onTab(CountriTab.Stats) }
+        BarItem(
+            icon = CountriIcons.Wishlist,
+            label = "Wishlist",
+            selected = current == CountriTab.Wishlist,
+            labelHeight = labelHeight,
+            labelAlpha = labelAlpha,
+            modifier = Modifier.weight(1f),
+        ) { haptics.tick(); onTab(CountriTab.Wishlist) }
     }
 }
 
 @Composable
-private fun TabItem(
+private fun BarItem(
     icon: ImageVector,
     label: String,
     selected: Boolean,
+    labelHeight: Dp,
+    labelAlpha: Float,
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
     val palette = Countri.palette
     val tint by animateColorAsState(
-        targetValue = if (selected) palette.visited else palette.textFaint,
+        targetValue = if (selected) palette.textPrimary else palette.textFaint,
         label = "tabTint",
     )
-    val dotSize by animateDpAsState(
-        targetValue = if (selected) 3.dp else 0.dp,
-        animationSpec = androidx.compose.animation.core.spring(0.55f, 500f),
-        label = "tabDot",
+    val highlight by animateColorAsState(
+        targetValue = if (selected) palette.recessed else Color.Transparent,
+        label = "tabHighlight",
     )
     Column(
         modifier = modifier
-            .pressScale(0.94f)
+            .pressScale(0.92f)
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
                 onClick = onClick,
-            )
-            .padding(vertical = 7.dp),
+            ),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(3.dp),
     ) {
-        Icon(icon, contentDescription = label, tint = tint, modifier = Modifier.size(22.dp))
-        Text(label, style = dev.sam.countri.ui.theme.CountriType.monoSmall, color = tint)
         Box(
-            Modifier
-                .size(dotSize)
+            modifier = Modifier
+                .size(width = 44.dp, height = 26.dp)
                 .clip(CircleShape)
-                .background(palette.visited)
+                .background(highlight),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(icon, contentDescription = label, tint = tint, modifier = Modifier.size(21.dp))
+        }
+        Text(
+            label,
+            style = CountriType.monoSmall,
+            color = tint,
+            maxLines = 1,
+            modifier = Modifier
+                .padding(top = 2.dp)
+                .height(labelHeight)
+                .alpha(labelAlpha),
         )
     }
 }

@@ -1,22 +1,32 @@
 ﻿package dev.sam.countri.ui.atlas
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
@@ -25,7 +35,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -34,6 +46,7 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
 import dev.sam.countri.data.catalog.CountryCatalog
@@ -76,7 +89,7 @@ fun AtlasScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 22.dp)
-                .padding(top = 14.dp, bottom = 10.dp),
+                .padding(top = 4.dp, bottom = 8.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.Top,
         ) {
@@ -139,24 +152,57 @@ fun AtlasScreen(
             }
         }
 
-        // ---- Recent journeys ----
+        // ---- Recent journeys: pull the tray up for the full list ----
+        var expanded by remember { mutableStateOf(false) }
+        var dragTotal by remember { mutableStateOf(0f) }
+        val allVisited = remember(countries) {
+            countries.filter { it.isVisited }.sortedByDescending { it.firstYear ?: 0 }
+        }
+        val expandedHeight = (LocalConfiguration.current.screenHeightDp * 0.62f).dp
+
         Column(
             Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
                 .background(palette.surface1)
-                .drawBehind {
-                    drawRect(palette.hairline, size = size.copy(height = 1.dp.toPx()))
-                }
+                .animateContentSize(
+                    androidx.compose.animation.core.spring(
+                        dampingRatio = 0.85f,
+                        stiffness = 380f,
+                    )
+                )
+                .draggable(
+                    state = rememberDraggableState { delta -> dragTotal += delta },
+                    orientation = Orientation.Vertical,
+                    onDragStarted = { dragTotal = 0f },
+                    onDragStopped = {
+                        if (dragTotal < -50f) expanded = true
+                        else if (dragTotal > 50f) expanded = false
+                    },
+                )
                 .padding(horizontal = 20.dp)
-                .padding(top = 16.dp, bottom = 10.dp)
         ) {
+            // Drag handle — the tray invites the pull.
+            Box(
+                Modifier
+                    .align(Alignment.CenterHorizontally)
+                    .padding(top = 8.dp)
+                    .size(width = 36.dp, height = 4.dp)
+                    .clip(CircleShape)
+                    .background(palette.textPrimary.copy(alpha = 0.15f))
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                    ) { expanded = !expanded }
+            )
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                SectionLabel("Recent journeys")
+                SectionLabel(if (expanded) "All journeys" else "Recent journeys")
                 Row(
                     modifier = Modifier
                         .clip(RoundedCornerShape(8.dp))
@@ -177,15 +223,29 @@ fun AtlasScreen(
                 }
             }
 
-            if (recent.isEmpty()) {
+            if (allVisited.isEmpty()) {
                 Text(
                     "Countries you add will land here.",
                     style = CountriType.bodySmall,
                     color = palette.textFaint,
-                    modifier = Modifier.padding(vertical = 18.dp),
+                    modifier = Modifier.padding(top = 6.dp, bottom = 92.dp),
                 )
+            } else if (expanded) {
+                LazyColumn(
+                    modifier = Modifier
+                        .padding(top = 6.dp)
+                        .height(expandedHeight),
+                    contentPadding = PaddingValues(bottom = 100.dp),
+                ) {
+                    itemsIndexed(allVisited, key = { _, it -> it.country.iso2 }) { index, entry ->
+                        RecentRow(
+                            entry = entry,
+                            showDivider = index < allVisited.lastIndex,
+                        ) { onCountryClick(entry.country.iso2) }
+                    }
+                }
             } else {
-                Column(Modifier.padding(top = 6.dp)) {
+                Column(Modifier.padding(top = 6.dp, bottom = 92.dp)) {
                     recent.forEachIndexed { index, entry ->
                         RecentRow(
                             entry = entry,
@@ -224,45 +284,67 @@ private fun AtlasMap(
     )
 }
 
+/** Segmented control with a white thumb that slides between the options. */
 @Composable
 private fun ModeToggle(mode: MapMode, onMode: (MapMode) -> Unit) {
     val palette = Countri.palette
-    Row(
+    val chipWidth = 64.dp
+    val chipHeight = 32.dp
+    val thumbOffset by animateDpAsState(
+        targetValue = if (mode == MapMode.Flat) 0.dp else chipWidth,
+        animationSpec = androidx.compose.animation.core.spring(
+            dampingRatio = 0.85f,
+            stiffness = 550f,
+        ),
+        label = "toggleThumb",
+    )
+    Box(
         Modifier
             .clip(CircleShape)
-            .background(palette.surface1)
+            .background(if (palette.isDark) palette.recessed else palette.hairline.copy(alpha = 0.55f))
             .padding(3.dp)
     ) {
-        ToggleChip("Flat", mode == MapMode.Flat) { onMode(MapMode.Flat) }
-        ToggleChip("Globe", mode == MapMode.Globe) { onMode(MapMode.Globe) }
+        // The sliding white highlight.
+        Box(
+            Modifier
+                .offset(x = thumbOffset)
+                .size(width = chipWidth, height = chipHeight)
+                .clip(CircleShape)
+                .background(palette.surface1)
+        )
+        Row {
+            ToggleChip("Flat", mode == MapMode.Flat, chipWidth, chipHeight) { onMode(MapMode.Flat) }
+            ToggleChip("Globe", mode == MapMode.Globe, chipWidth, chipHeight) { onMode(MapMode.Globe) }
+        }
     }
 }
 
 @Composable
-private fun ToggleChip(text: String, selected: Boolean, onClick: () -> Unit) {
+private fun ToggleChip(
+    text: String,
+    selected: Boolean,
+    width: androidx.compose.ui.unit.Dp,
+    height: androidx.compose.ui.unit.Dp,
+    onClick: () -> Unit,
+) {
     val palette = Countri.palette
-    val bg by animateColorAsState(
-        if (selected) palette.surface2 else androidx.compose.ui.graphics.Color.Transparent,
-        label = "chipBg",
-    )
     val fg by animateColorAsState(
-        if (selected) palette.visited else palette.textSecondary,
+        if (selected) palette.textPrimary else palette.textFaint,
         label = "chipFg",
     )
-    Text(
-        text = text,
-        style = CountriType.mono,
-        color = fg,
+    Box(
         modifier = Modifier
+            .size(width = width, height = height)
             .clip(CircleShape)
-            .background(bg)
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
                 onClick = onClick,
-            )
-            .padding(horizontal = 13.dp, vertical = 7.dp),
-    )
+            ),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(text, style = CountriType.mono, color = fg)
+    }
 }
 
 @Composable
