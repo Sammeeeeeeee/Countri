@@ -85,6 +85,7 @@ fun CountriRoot(startAtOnboarding: Boolean = false) {
             navController = navController,
             viewModel = viewModel,
             startAtOnboarding = startAtOnboarding,
+            onBarCompact = { barMinimized = it },
             modifier = Modifier
                 .fillMaxSize()
                 .nestedScroll(barScrollConnection),
@@ -127,6 +128,7 @@ fun CountriNavHost(
     navController: NavHostController,
     viewModel: AtlasViewModel,
     startAtOnboarding: Boolean,
+    onBarCompact: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     NavHost(
@@ -161,6 +163,7 @@ fun CountriNavHost(
                 viewModel = viewModel,
                 onCountryClick = { iso -> navController.navigate(DetailRoute(iso)) },
                 onSeePassport = { navController.navigateToTab(CountriTab.Passport) },
+                onBarCompact = onBarCompact,
             )
         }
         composable<PassportRoute> {

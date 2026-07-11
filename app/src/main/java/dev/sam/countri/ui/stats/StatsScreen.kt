@@ -30,8 +30,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -52,8 +54,7 @@ import dev.sam.countri.ui.components.CountriIcons
 import dev.sam.countri.ui.components.LocalHaptics
 import dev.sam.countri.ui.components.SectionLabel
 import dev.sam.countri.ui.components.flagEmoji
-import dev.sam.countri.ui.share.StatsCardRenderer
-import dev.sam.countri.ui.share.shareBitmap
+import dev.sam.countri.ui.share.StatsShareSheet
 import dev.sam.countri.ui.theme.Countri
 import dev.sam.countri.ui.theme.CountriType
 import dev.sam.countri.ui.theme.MonoFamily
@@ -73,6 +74,7 @@ fun StatsScreen(viewModel: AtlasViewModel) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val stats by viewModel.stats.collectAsState()
+    var showShare by remember { mutableStateOf(false) }
 
     // One driver for every number on screen: they land together.
     val progress = remember { Animatable(0f) }
@@ -116,12 +118,7 @@ fun StatsScreen(viewModel: AtlasViewModel) {
                         indication = null,
                     ) {
                         haptics.tick()
-                        shareBitmap(
-                            context,
-                            StatsCardRenderer.render(context, stats),
-                            "countri-stats.png",
-                            "Share your stats",
-                        )
+                        showShare = true
                     },
                 contentAlignment = Alignment.Center,
             ) {
@@ -348,6 +345,10 @@ fun StatsScreen(viewModel: AtlasViewModel) {
         }
 
         Box(Modifier.height(110.dp))
+    }
+
+    if (showShare) {
+        StatsShareSheet(stats = stats, onDismiss = { showShare = false })
     }
 }
 

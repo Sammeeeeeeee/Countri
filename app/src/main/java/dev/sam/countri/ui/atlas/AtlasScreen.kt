@@ -1,7 +1,6 @@
 ﻿package dev.sam.countri.ui.atlas
 
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.animateDpAsState
@@ -36,7 +35,9 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -47,7 +48,9 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 import dev.sam.countri.data.catalog.CountryCatalog
 import dev.sam.countri.domain.CountryWithState
@@ -68,6 +71,7 @@ fun AtlasScreen(
     viewModel: AtlasViewModel,
     onCountryClick: (String) -> Unit,
     onSeePassport: () -> Unit,
+    onBarCompact: (Boolean) -> Unit = {},
 ) {
     val palette = Countri.palette
     val haptics = LocalHaptics.current
@@ -152,37 +156,61 @@ fun AtlasScreen(
             }
         }
 
-        // ---- Recent journeys: pull the tray up for the full list ----
-        var expanded by remember { mutableStateOf(false) }
-        var dragTotal by remember { mutableStateOf(0f) }
+        // ---- Recent journeys: a sheet with three detents, drag anywhere ----
+        val density = LocalDensity.current
+        val screenHeight = LocalConfiguration.current.screenHeightDp.dp
+        val lowPx = with(density) { 128.dp.toPx() }
+        val midPx = with(density) { 344.dp.toPx() }
+        val highPx = with(density) { (screenHeight * 0.66f).toPx() }
+        val trayHeight = remember { Animatable(midPx) }
+        val trayScope = rememberCoroutineScope()
         val allVisited = remember(countries) {
             countries.filter { it.isVisited }.sortedByDescending { it.firstYear ?: 0 }
         }
-        val expandedHeight = (LocalConfiguration.current.screenHeightDp * 0.62f).dp
+        val trayHigh by remember { derivedStateOf { trayHeight.value > midPx * 1.12f } }
+        // Riding high compacts the nav pill, like scrolling does elsewhere.
+        LaunchedEffect(trayHigh) { onBarCompact(trayHigh) }
+
+        fun settleTray(velocity: Float) {
+            val target = when {
+                velocity < -900f -> highPx
+                velocity > 900f -> if (trayHeight.value > midPx) midPx else lowPx
+                else -> listOf(lowPx, midPx, highPx).minByOrNull {
+                    kotlin.math.abs(it - trayHeight.value)
+                } ?: midPx
+            }
+            trayScope.launch {
+                trayHeight.animateTo(
+                    target,
+                    androidx.compose.animation.core.spring(
+                        dampingRatio = 0.78f,
+                        stiffness = 320f,
+                    ),
+                    initialVelocity = -velocity,
+                )
+            }
+        }
 
         Column(
             Modifier
                 .fillMaxWidth()
+                .height(with(density) { trayHeight.value.toDp() })
                 .clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
                 .background(palette.surface1)
-                .animateContentSize(
-                    androidx.compose.animation.core.spring(
-                        dampingRatio = 0.85f,
-                        stiffness = 380f,
-                    )
-                )
                 .draggable(
-                    state = rememberDraggableState { delta -> dragTotal += delta },
                     orientation = Orientation.Vertical,
-                    onDragStarted = { dragTotal = 0f },
-                    onDragStopped = {
-                        if (dragTotal < -50f) expanded = true
-                        else if (dragTotal > 50f) expanded = false
+                    state = rememberDraggableState { delta ->
+                        trayScope.launch {
+                            trayHeight.snapTo(
+                                (trayHeight.value - delta).coerceIn(lowPx * 0.9f, highPx * 1.03f)
+                            )
+                        }
                     },
+                    onDragStopped = { velocity -> settleTray(velocity) },
                 )
                 .padding(horizontal = 20.dp)
         ) {
-            // Drag handle — the tray invites the pull.
+            // Drag handle — tap jumps between detents; any drag works too.
             Box(
                 Modifier
                     .align(Alignment.CenterHorizontally)
@@ -193,7 +221,17 @@ fun AtlasScreen(
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null,
-                    ) { expanded = !expanded }
+                    ) {
+                        trayScope.launch {
+                            trayHeight.animateTo(
+                                if (trayHigh) midPx else highPx,
+                                androidx.compose.animation.core.spring(
+                                    dampingRatio = 0.78f,
+                                    stiffness = 320f,
+                                ),
+                            )
+                        }
+                    }
             )
             Row(
                 modifier = Modifier
@@ -202,7 +240,7 @@ fun AtlasScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                SectionLabel(if (expanded) "All journeys" else "Recent journeys")
+                SectionLabel(if (trayHigh) "All journeys" else "Recent journeys")
                 Row(
                     modifier = Modifier
                         .clip(RoundedCornerShape(8.dp))
@@ -228,28 +266,20 @@ fun AtlasScreen(
                     "Countries you add will land here.",
                     style = CountriType.bodySmall,
                     color = palette.textFaint,
-                    modifier = Modifier.padding(top = 6.dp, bottom = 92.dp),
+                    modifier = Modifier.padding(top = 6.dp),
                 )
-            } else if (expanded) {
+            } else {
                 LazyColumn(
                     modifier = Modifier
                         .padding(top = 6.dp)
-                        .height(expandedHeight),
+                        .weight(1f),
+                    userScrollEnabled = trayHigh,
                     contentPadding = PaddingValues(bottom = 100.dp),
                 ) {
                     itemsIndexed(allVisited, key = { _, it -> it.country.iso2 }) { index, entry ->
                         RecentRow(
                             entry = entry,
                             showDivider = index < allVisited.lastIndex,
-                        ) { onCountryClick(entry.country.iso2) }
-                    }
-                }
-            } else {
-                Column(Modifier.padding(top = 6.dp, bottom = 92.dp)) {
-                    recent.forEachIndexed { index, entry ->
-                        RecentRow(
-                            entry = entry,
-                            showDivider = index < recent.lastIndex,
                         ) { onCountryClick(entry.country.iso2) }
                     }
                 }

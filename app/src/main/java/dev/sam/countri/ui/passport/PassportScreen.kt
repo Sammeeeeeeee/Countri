@@ -4,6 +4,7 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -27,6 +28,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -35,6 +37,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
@@ -177,6 +180,15 @@ private fun Stamp(
     val haptics = LocalHaptics.current
     val accent = palette.continentColor(entry.country.continent)
 
+    // One page per visit; swiping cycles which trip's dates face front.
+    val years = remember(entry.visits, entry.firstYear) {
+        if (entry.visits.isEmpty()) listOf(entry.firstYear)
+        else entry.visits.sortedByDescending { it.start }.map { it.start.year }
+    }
+    var topIndex by remember(entry.country.iso2) { mutableStateOf(0) }
+    val swipeX = remember { Animatable(0f) }
+    val swipeScope = rememberCoroutineScope()
+
     // Stamp hit: starts big and transparent, slams down with overshoot.
     val scale = remember(entry.country.iso2) { Animatable(2.3f) }
     val alpha = remember(entry.country.iso2) { Animatable(0f) }
@@ -194,18 +206,89 @@ private fun Stamp(
                 scaleX = scale.value
                 scaleY = scale.value
                 this.alpha = alpha.value
-                rotationZ = stampRotation(entry.country.iso2)
-            }
-            .pressScale(0.92f)
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                onClick = onClick,
-            ),
+            },
         contentAlignment = Alignment.Center,
     ) {
+        // The rest of the pile peeks out from behind.
+        val behind = (years.size - 1).coerceAtMost(2)
+        for (k in behind downTo 1) {
+            StampFace(
+                iso2 = entry.country.iso2,
+                year = years[(topIndex + k) % years.size],
+                accent = accent,
+                faceAlpha = 0.35f / k,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        translationX = 7.dp.toPx() * k
+                        translationY = -5.dp.toPx() * k
+                        rotationZ = stampRotation(entry.country.iso2) + 6f * k
+                    },
+            )
+        }
+        StampFace(
+            iso2 = entry.country.iso2,
+            year = years[topIndex],
+            accent = accent,
+            faceAlpha = 1f,
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer {
+                    translationX = swipeX.value
+                    rotationZ = stampRotation(entry.country.iso2) + swipeX.value / 22f
+                }
+                .pressScale(0.92f)
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = onClick,
+                )
+                .then(
+                    if (years.size > 1) Modifier.pointerInput(years.size) {
+                        var total = 0f
+                        detectHorizontalDragGestures(
+                            onDragStart = { total = 0f },
+                            onHorizontalDrag = { change, delta ->
+                                change.consume()
+                                total += delta
+                                swipeScope.launch { swipeX.snapTo(total * 0.6f) }
+                            },
+                            onDragEnd = {
+                                if (kotlin.math.abs(total) > 42f) {
+                                    haptics.tick()
+                                    swipeScope.launch {
+                                        swipeX.animateTo(
+                                            if (total > 0) 90f else -90f,
+                                            Springs.Fast,
+                                        )
+                                        topIndex = (topIndex + 1) % years.size
+                                        swipeX.snapTo(0f)
+                                    }
+                                } else {
+                                    swipeScope.launch { swipeX.animateTo(0f, Springs.Bouncy) }
+                                }
+                            },
+                        )
+                    } else Modifier
+                ),
+        )
+    }
+}
+
+@Composable
+private fun StampFace(
+    iso2: String,
+    year: Int?,
+    accent: androidx.compose.ui.graphics.Color,
+    faceAlpha: Float,
+    modifier: Modifier = Modifier,
+) {
+    val palette = Countri.palette
+    Box(modifier.graphicsLayer { alpha = faceAlpha }, contentAlignment = Alignment.Center) {
         Canvas(Modifier.fillMaxSize()) {
             val r = size.minDimension / 2f
+            // Solid backing so stacked stamps don't show through each other.
+            drawCircle(color = palette.canvas, radius = r - 1.dp.toPx())
             drawCircle(
                 color = accent.copy(alpha = 0.5f),
                 radius = r - 1.dp.toPx(),
@@ -224,11 +307,11 @@ private fun Stamp(
         }
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
-                flagEmoji(entry.country.iso2),
+                flagEmoji(iso2),
                 style = CountriType.body.copy(fontSize = 30.sp),
             )
             Text(
-                entry.firstYear?.toString() ?: "—",
+                year?.toString() ?: "—",
                 style = CountriType.monoSmall,
                 color = accent.copy(alpha = 0.75f),
                 modifier = Modifier.padding(top = 3.dp),
@@ -236,4 +319,3 @@ private fun Stamp(
         }
     }
 }
-

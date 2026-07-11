@@ -84,7 +84,14 @@ fun WorldMap(
         } else {
             val target = if (mode == MapMode.Globe) 1f else 0f
             if (state.morph.value != target) {
-                state.morph.animateTo(target, Springs.Smooth)
+                // A slow, luxurious wrap — the signature move deserves time.
+                state.morph.animateTo(
+                    target,
+                    androidx.compose.animation.core.spring(
+                        dampingRatio = 0.82f,
+                        stiffness = 200f,
+                    ),
+                )
             }
         }
     }
@@ -125,7 +132,7 @@ fun WorldMap(
                         state.centerLon -= state.flatVelX * dt / s
                         state.centerLat += state.flatVelY * dt / s
                         state.clampCamera(canvasSize.width, canvasSize.height)
-                        val decay = exp(-dt * 4.5f)
+                        val decay = exp(-dt * 3.0f)
                         state.flatVelX *= decay
                         state.flatVelY *= decay
                         if (!state.flatFlinging) {
@@ -202,8 +209,13 @@ fun WorldMap(
                             if (zoomChange != 1f && centroid.isSpecified) {
                                 val geoLon = state.centerLon + (centroid.x - w / 2f) / sOld
                                 val geoLat = state.centerLat - (centroid.y - h / 2f) / sOld
-                                state.zoom = (state.zoom * zoomChange)
-                                    .coerceIn(1f, WorldMapState.MAX_ZOOM)
+                                val rawZoom = state.zoom * zoomChange
+                                state.zoom = when {
+                                    rawZoom < 1f -> 1f - (1f - rawZoom) * 0.45f
+                                    rawZoom > WorldMapState.MAX_ZOOM ->
+                                        WorldMapState.MAX_ZOOM + (rawZoom - WorldMapState.MAX_ZOOM) * 0.35f
+                                    else -> rawZoom
+                                }.coerceIn(0.72f, WorldMapState.MAX_ZOOM * 1.18f)
                                 val sNew = MapProjection.flatScale(w, h, state.zoom)
                                 state.centerLon = geoLon - (centroid.x - w / 2f) / sNew
                                 state.centerLat = geoLat + (centroid.y - h / 2f) / sNew
@@ -225,6 +237,18 @@ fun WorldMap(
                         // Let the pan glide on with the finger's momentum.
                         state.flatVelX = flatVelXEma
                         state.flatVelY = flatVelYEma
+                        // Overstretched zoom springs back into range.
+                        if (state.zoom < 1f || state.zoom > WorldMapState.MAX_ZOOM) {
+                            val clamped = state.zoom.coerceIn(1f, WorldMapState.MAX_ZOOM)
+                            scope.launch {
+                                animate(state.zoom, clamped, animationSpec = Springs.Bouncy) { v, _ ->
+                                    state.zoom = v
+                                    if (canvasSize.width > 0f) {
+                                        state.clampCamera(canvasSize.width, canvasSize.height)
+                                    }
+                                }
+                            }
+                        }
                     }
                     state.noteInteraction(SystemClock.uptimeMillis())
                 }

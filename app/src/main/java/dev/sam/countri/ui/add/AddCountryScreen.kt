@@ -172,9 +172,13 @@ fun AddCountryScreen(
         )
 
         LazyColumn(
-            modifier = Modifier.weight(1f),
+            modifier = Modifier
+                .weight(1f)
+                .padding(horizontal = 16.dp)
+                .clip(RoundedCornerShape(20.dp))
+                .background(palette.surface1),
             contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                start = 14.dp, end = 14.dp, bottom = 24.dp,
+                start = 4.dp, end = 4.dp, top = 6.dp, bottom = 12.dp,
             ),
         ) {
             items(filtered, key = { it.country.iso2 }) { entry ->
@@ -220,7 +224,6 @@ private fun CountryRow(
             .fillMaxWidth()
             .pressScale(0.98f)
             .clip(RoundedCornerShape(16.dp))
-            .background(palette.surface1)
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,

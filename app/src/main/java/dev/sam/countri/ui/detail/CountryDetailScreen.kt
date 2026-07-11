@@ -45,11 +45,10 @@ import androidx.compose.ui.unit.sp
 import dev.sam.countri.ui.components.CountriIcons
 import dev.sam.countri.ui.components.LocalHaptics
 import dev.sam.countri.ui.components.SectionLabel
-import dev.sam.countri.ui.components.StatusPill
 import dev.sam.countri.ui.components.flagEmoji
 import dev.sam.countri.ui.map.CityMarker
 import dev.sam.countri.ui.map.CountrySilhouette
-import dev.sam.countri.ui.share.VisitCardRenderer
+import dev.sam.countri.ui.share.CountryCardRenderer
 import dev.sam.countri.ui.share.shareBitmap
 import dev.sam.countri.ui.theme.Countri
 import dev.sam.countri.ui.theme.CountriType
@@ -112,7 +111,7 @@ fun CountryDetailScreen(
                     .padding(start = 16.dp, top = 8.dp)
                     .size(38.dp)
                     .pressScale(0.9f)
-                    .clip(RoundedCornerShape(12.dp))
+                    .clip(CircleShape)
                     .background(palette.surface1.copy(alpha = 0.92f))
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
@@ -127,28 +126,51 @@ fun CountryDetailScreen(
                     modifier = Modifier.size(20.dp),
                 )
             }
+            if (entry.status != null) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .statusBarsPadding()
+                        .padding(end = 16.dp, top = 8.dp)
+                        .size(38.dp)
+                        .pressScale(0.9f)
+                        .clip(CircleShape)
+                        .background(palette.surface1.copy(alpha = 0.92f))
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                        ) {
+                            haptics.tick()
+                            shareBitmap(
+                                context,
+                                CountryCardRenderer.render(context, entry),
+                                "countri-country.png",
+                                "Share " + entry.country.name,
+                            )
+                        },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        CountriIcons.Share,
+                        contentDescription = "Share country",
+                        tint = palette.textPrimary,
+                        modifier = Modifier.size(17.dp),
+                    )
+                }
+            }
         }
 
         // ---- Identity ----
         Column(Modifier.padding(horizontal = 22.dp)) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                StatusPill(
-                    text = when (entry.status) {
-                        CountryStatus.VISITED -> "Visited"
-                        CountryStatus.WISHLIST -> "On the wishlist"
-                        null -> "Not yet"
-                    },
-                    accent = accent,
-                )
-                Text(
-                    entry.country.continent.displayName,
-                    style = CountriType.bodySmall,
-                    color = continentHue.copy(alpha = 0.8f),
-                )
-            }
+            Text(
+                text = when (entry.status) {
+                    CountryStatus.VISITED -> "Visited"
+                    CountryStatus.WISHLIST -> "On the wishlist"
+                    null -> "Not yet"
+                } + "  ·  " + entry.country.continent.displayName,
+                style = CountriType.bodySmall,
+                color = palette.textFaint,
+            )
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -200,15 +222,6 @@ fun CountryDetailScreen(
                                 visit = visit,
                                 accent = continentHue,
                                 onClick = { editVisit = visit },
-                                onShare = {
-                                    haptics.tick()
-                                    shareBitmap(
-                                        context,
-                                        VisitCardRenderer.render(context, entry, visit),
-                                        "countri-visit.png",
-                                        "Share your trip",
-                                    )
-                                },
                                 onDelete = {
                                     haptics.reject()
                                     viewModel.deleteVisit(visit.id)
@@ -417,7 +430,6 @@ private fun VisitCard(
     visit: dev.sam.countri.domain.Visit,
     accent: Color,
     onClick: () -> Unit,
-    onShare: () -> Unit,
     onDelete: () -> Unit,
 ) {
     val palette = Countri.palette
@@ -454,27 +466,6 @@ private fun VisitCard(
             }
             Box(
                 modifier = Modifier
-                    .size(32.dp)
-                    .pressScale(0.88f)
-                    .clip(CircleShape)
-                    .background(palette.recessed)
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                        onClick = onShare,
-                    ),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    CountriIcons.Share,
-                    contentDescription = "Share visit",
-                    tint = palette.textSecondary,
-                    modifier = Modifier.size(14.dp),
-                )
-            }
-            Box(
-                modifier = Modifier
-                    .padding(start = 8.dp)
                     .size(32.dp)
                     .pressScale(0.88f)
                     .clip(CircleShape)

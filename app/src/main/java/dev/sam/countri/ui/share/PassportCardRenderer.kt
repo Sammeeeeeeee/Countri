@@ -67,8 +67,8 @@ object PassportCardRenderer {
     fun render(context: Context, stamps: List<CountryWithState>, style: ShareStyle): Bitmap {
         val bitmap = Bitmap.createBitmap(WIDTH, HEIGHT, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
-        val display = ResourcesCompat.getFont(context, R.font.inter) ?: Typeface.DEFAULT
-        val mono = ResourcesCompat.getFont(context, R.font.inter) ?: Typeface.DEFAULT
+        val display = interTypeface(context, 500)
+        val mono = interTypeface(context, 600)
 
         canvas.drawColor(style.background)
 

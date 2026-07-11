@@ -1,6 +1,7 @@
 package dev.sam.countri.ui.nav
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
@@ -10,17 +11,21 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -28,6 +33,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.Dp
@@ -72,7 +78,7 @@ fun CountriBottomBar(
         label = "labelAlpha",
     )
 
-    Row(
+    BoxWithConstraints(
         modifier = modifier
             .navigationBarsPadding()
             .padding(horizontal = 14.dp)
@@ -92,6 +98,38 @@ fun CountriBottomBar(
                 else Modifier
             )
             .padding(horizontal = 10.dp),
+    ) {
+        // The active-tab highlight slides between slots, Revolut-style.
+        val slotWidth = maxWidth / 5
+        val slotIndex = when (current) {
+            CountriTab.Atlas -> 0
+            CountriTab.Passport -> 1
+            CountriTab.Stats -> 3
+            CountriTab.Wishlist -> 4
+            null -> 0
+        }
+        val highlightX by animateDpAsState(
+            targetValue = slotWidth * slotIndex + (slotWidth - 46.dp) / 2,
+            animationSpec = spring(dampingRatio = 0.8f, stiffness = 480f),
+            label = "tabSlide",
+        )
+        val highlightYShift by animateDpAsState(
+            targetValue = -(labelHeight + 2.dp) / 2,
+            animationSpec = spring(dampingRatio = 0.85f, stiffness = 380f),
+            label = "tabSlideY",
+        )
+        if (current != null) {
+            Box(
+                Modifier
+                    .align(Alignment.CenterStart)
+                    .offset(x = highlightX, y = highlightYShift)
+                    .size(width = 46.dp, height = 28.dp)
+                    .clip(CircleShape)
+                    .background(palette.recessed)
+            )
+        }
+    Row(
+        modifier = Modifier.fillMaxSize(),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         BarItem(
@@ -165,6 +203,7 @@ fun CountriBottomBar(
             modifier = Modifier.weight(1f),
         ) { haptics.tick(); onTab(CountriTab.Wishlist) }
     }
+    }
 }
 
 @Composable
@@ -182,10 +221,14 @@ private fun BarItem(
         targetValue = if (selected) palette.textPrimary else palette.textFaint,
         label = "tabTint",
     )
-    val highlight by animateColorAsState(
-        targetValue = if (selected) palette.recessed else Color.Transparent,
-        label = "tabHighlight",
-    )
+    // Little spring pop when the tab becomes active.
+    val pop = remember { Animatable(1f) }
+    LaunchedEffect(selected) {
+        if (selected) {
+            pop.snapTo(0.72f)
+            pop.animateTo(1f, spring(dampingRatio = 0.5f, stiffness = 600f))
+        }
+    }
     Column(
         modifier = modifier
             .pressScale(0.92f)
@@ -197,13 +240,20 @@ private fun BarItem(
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Box(
-            modifier = Modifier
-                .size(width = 44.dp, height = 26.dp)
-                .clip(CircleShape)
-                .background(highlight),
+            modifier = Modifier.size(width = 44.dp, height = 26.dp),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(icon, contentDescription = label, tint = tint, modifier = Modifier.size(21.dp))
+            Icon(
+                icon,
+                contentDescription = label,
+                tint = tint,
+                modifier = Modifier
+                    .size(21.dp)
+                    .graphicsLayer {
+                        scaleX = pop.value
+                        scaleY = pop.value
+                    },
+            )
         }
         Text(
             label,

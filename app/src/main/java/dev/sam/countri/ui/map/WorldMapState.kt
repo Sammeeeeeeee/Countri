@@ -25,9 +25,11 @@ class WorldMapState(initialMode: MapMode) {
 
     val flatViewport: MapViewport get() = MapViewport(centerLon, centerLat, zoom)
 
-    /** Keeps the camera inside the world band for the current canvas size. */
+    /**
+     * Keeps the camera center inside the world band. Zoom is deliberately
+     * left alone so pinches can rubber-band past the limits and spring back.
+     */
     fun clampCamera(w: Float, h: Float) {
-        zoom = zoom.coerceIn(1f, MAX_ZOOM)
         val s = MapProjection.flatScale(w, h, zoom)
         val halfLon = w / (2f * s)
         val halfLat = h / (2f * s)

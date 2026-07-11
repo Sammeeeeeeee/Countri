@@ -30,7 +30,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.sam.countri.ui.AtlasViewModel
 import dev.sam.countri.ui.components.CountriIcons
-import dev.sam.countri.ui.components.StatusPill
 import dev.sam.countri.ui.components.flagEmoji
 import dev.sam.countri.ui.theme.Countri
 import dev.sam.countri.ui.theme.CountriType
@@ -135,7 +134,6 @@ fun WishlistScreen(
                                 modifier = Modifier.padding(top = 2.dp),
                             )
                         }
-                        StatusPill("Someday", palette.wishlist)
                     }
                 }
             }

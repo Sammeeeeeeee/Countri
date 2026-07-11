@@ -46,6 +46,8 @@ import dev.sam.countri.domain.Visit
 import dev.sam.countri.ui.components.CountriIcons
 import dev.sam.countri.ui.components.LocalHaptics
 import dev.sam.countri.ui.components.SectionLabel
+import dev.sam.countri.ui.share.VisitCardRenderer
+import dev.sam.countri.ui.share.shareBitmap
 import dev.sam.countri.ui.theme.Countri
 import dev.sam.countri.ui.theme.CountriType
 import dev.sam.countri.ui.theme.pressScale
@@ -72,6 +74,7 @@ fun AddVisitSheet(
 ) {
     val palette = Countri.palette
     val haptics = LocalHaptics.current
+    val context = androidx.compose.ui.platform.LocalContext.current
     val iso2 = entry.country.iso2
 
     var startEpochDay by remember(existing) {
@@ -115,12 +118,48 @@ fun AddVisitSheet(
                 .imePadding()
                 .navigationBarsPadding()
         ) {
-            Text(
-                if (existing != null) "Edit visit" else "A trip to ${entry.country.name}",
-                style = CountriType.title,
-                color = palette.textPrimary,
-                modifier = Modifier.padding(bottom = 16.dp),
-            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    if (existing != null) "Edit visit" else "A trip to ${entry.country.name}",
+                    style = CountriType.title,
+                    color = palette.textPrimary,
+                )
+                if (existing != null) {
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .pressScale(0.9f)
+                            .clip(CircleShape)
+                            .background(palette.recessed)
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null,
+                            ) {
+                                haptics.tick()
+                                shareBitmap(
+                                    context,
+                                    VisitCardRenderer.render(context, entry, existing),
+                                    "countri-visit.png",
+                                    "Share your trip",
+                                )
+                            },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            CountriIcons.Share,
+                            contentDescription = "Share visit",
+                            tint = palette.textSecondary,
+                            modifier = Modifier.size(16.dp),
+                        )
+                    }
+                }
+            }
 
             // ---- cities first: field + live suggestions stay above the keyboard ----
             SectionLabel("Cities")

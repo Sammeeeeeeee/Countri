@@ -4,79 +4,122 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.PathFillType
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.path
 import androidx.compose.ui.unit.dp
 
 /**
- * Hand-drawn 24x24 line icons, 2.2 stroke — the app's entire icon set,
+ * Hand-drawn 24x24 icons: filled Revolut-style glyphs for the tabs,
+ * 2.2-stroke linework for utilities — the app's entire icon set,
  * weighted like Revolut's product glyphs and tinted by Icon().
  */
 object CountriIcons {
+    // ---- tab glyphs: filled, Revolut-style ----
+
     val Atlas: ImageVector by lazy {
         ImageVector.Builder("atlas", 24.dp, 24.dp, 24f, 24f).apply {
-            path(stroke = SolidColor(Color.White), strokeLineWidth = 2.2f, strokeLineCap = StrokeCap.Round) {
-                moveTo(12f, 3f)
-                arcTo(9f, 9f, 0f, true, true, 11.99f, 3f)
-            }
-            path(stroke = SolidColor(Color.White), strokeLineWidth = 2.2f, strokeLineCap = StrokeCap.Round) {
-                moveTo(3f, 12f); lineTo(21f, 12f)
-            }
-            path(stroke = SolidColor(Color.White), strokeLineWidth = 2.2f, strokeLineCap = StrokeCap.Round) {
-                moveTo(12f, 3f)
-                curveTo(14.5f, 5.5f, 14.5f, 18.5f, 12f, 21f)
-                moveTo(12f, 3f)
-                curveTo(9.5f, 5.5f, 9.5f, 18.5f, 12f, 21f)
+            // Solid globe with punched equator and meridian slits.
+            path(fill = SolidColor(Color.White), pathFillType = PathFillType.EvenOdd) {
+                moveTo(12f, 2.6f)
+                arcTo(9.4f, 9.4f, 0f, true, true, 11.99f, 2.6f)
+                close()
+                // equator slit
+                moveTo(2.8f, 11.1f)
+                lineTo(21.2f, 11.1f)
+                lineTo(21.2f, 12.9f)
+                lineTo(2.8f, 12.9f)
+                close()
+                // meridian slit
+                moveTo(11.1f, 2.8f)
+                curveTo(8.2f, 5.8f, 8.2f, 18.2f, 11.1f, 21.2f)
+                lineTo(12.9f, 21.2f)
+                curveTo(10f, 18.2f, 10f, 5.8f, 12.9f, 2.8f)
+                close()
             }
         }.build()
     }
 
     val Passport: ImageVector by lazy {
         ImageVector.Builder("passport", 24.dp, 24.dp, 24f, 24f).apply {
-            path(stroke = SolidColor(Color.White), strokeLineWidth = 2.2f, strokeLineCap = StrokeCap.Round, strokeLineJoin = StrokeJoin.Round) {
-                moveTo(7f, 3f)
-                lineTo(17f, 3f)
-                arcTo(2f, 2f, 0f, false, true, 19f, 5f)
-                lineTo(19f, 19f)
-                arcTo(2f, 2f, 0f, false, true, 17f, 21f)
-                lineTo(7f, 21f)
-                arcTo(2f, 2f, 0f, false, true, 5f, 19f)
-                lineTo(5f, 5f)
-                arcTo(2f, 2f, 0f, false, true, 7f, 3f)
+            // Solid booklet, punched portrait circle and name line.
+            path(fill = SolidColor(Color.White), pathFillType = PathFillType.EvenOdd) {
+                moveTo(7f, 2.6f)
+                lineTo(17f, 2.6f)
+                arcTo(2.4f, 2.4f, 0f, false, true, 19.4f, 5f)
+                lineTo(19.4f, 19f)
+                arcTo(2.4f, 2.4f, 0f, false, true, 17f, 21.4f)
+                lineTo(7f, 21.4f)
+                arcTo(2.4f, 2.4f, 0f, false, true, 4.6f, 19f)
+                lineTo(4.6f, 5f)
+                arcTo(2.4f, 2.4f, 0f, false, true, 7f, 2.6f)
                 close()
-            }
-            path(stroke = SolidColor(Color.White), strokeLineWidth = 2.2f) {
-                moveTo(12f, 7.4f)
-                arcTo(2.6f, 2.6f, 0f, true, true, 11.99f, 7.4f)
-            }
-            path(stroke = SolidColor(Color.White), strokeLineWidth = 2.2f, strokeLineCap = StrokeCap.Round) {
-                moveTo(9f, 16f); lineTo(15f, 16f)
+                moveTo(12f, 6.6f)
+                arcTo(3.1f, 3.1f, 0f, true, true, 11.99f, 6.6f)
+                close()
+                moveTo(8.6f, 15.4f)
+                lineTo(15.4f, 15.4f)
+                lineTo(15.4f, 17.2f)
+                lineTo(8.6f, 17.2f)
+                close()
             }
         }.build()
     }
 
     val Stats: ImageVector by lazy {
         ImageVector.Builder("stats", 24.dp, 24.dp, 24f, 24f).apply {
-            path(stroke = SolidColor(Color.White), strokeLineWidth = 2.2f, strokeLineCap = StrokeCap.Round) {
-                moveTo(5f, 20f); lineTo(5f, 11f)
-                moveTo(10.5f, 20f); lineTo(10.5f, 4f)
-                moveTo(16f, 20f); lineTo(16f, 13f)
-                moveTo(21f, 20f); lineTo(3f, 20f)
+            // Three solid rounded bars.
+            path(fill = SolidColor(Color.White)) {
+                moveTo(4.4f, 11f)
+                lineTo(7.6f, 11f)
+                arcTo(0.9f, 0.9f, 0f, false, true, 8.5f, 11.9f)
+                lineTo(8.5f, 19.6f)
+                arcTo(0.9f, 0.9f, 0f, false, true, 7.6f, 20.5f)
+                lineTo(4.4f, 20.5f)
+                arcTo(0.9f, 0.9f, 0f, false, true, 3.5f, 19.6f)
+                lineTo(3.5f, 11.9f)
+                arcTo(0.9f, 0.9f, 0f, false, true, 4.4f, 11f)
+                close()
+            }
+            path(fill = SolidColor(Color.White)) {
+                moveTo(10.4f, 3.5f)
+                lineTo(13.6f, 3.5f)
+                arcTo(0.9f, 0.9f, 0f, false, true, 14.5f, 4.4f)
+                lineTo(14.5f, 19.6f)
+                arcTo(0.9f, 0.9f, 0f, false, true, 13.6f, 20.5f)
+                lineTo(10.4f, 20.5f)
+                arcTo(0.9f, 0.9f, 0f, false, true, 9.5f, 19.6f)
+                lineTo(9.5f, 4.4f)
+                arcTo(0.9f, 0.9f, 0f, false, true, 10.4f, 3.5f)
+                close()
+            }
+            path(fill = SolidColor(Color.White)) {
+                moveTo(16.4f, 13.5f)
+                lineTo(19.6f, 13.5f)
+                arcTo(0.9f, 0.9f, 0f, false, true, 20.5f, 14.4f)
+                lineTo(20.5f, 19.6f)
+                arcTo(0.9f, 0.9f, 0f, false, true, 19.6f, 20.5f)
+                lineTo(16.4f, 20.5f)
+                arcTo(0.9f, 0.9f, 0f, false, true, 15.5f, 19.6f)
+                lineTo(15.5f, 14.4f)
+                arcTo(0.9f, 0.9f, 0f, false, true, 16.4f, 13.5f)
+                close()
             }
         }.build()
     }
 
     val Wishlist: ImageVector by lazy {
         ImageVector.Builder("wishlist", 24.dp, 24.dp, 24f, 24f).apply {
-            path(stroke = SolidColor(Color.White), strokeLineWidth = 2.2f, strokeLineCap = StrokeCap.Round, strokeLineJoin = StrokeJoin.Round) {
-                moveTo(6f, 3f)
-                lineTo(18f, 3f)
-                arcTo(1f, 1f, 0f, false, true, 19f, 4f)
-                lineTo(19f, 21f)
-                lineTo(12f, 17f)
-                lineTo(5f, 21f)
-                lineTo(5f, 4f)
-                arcTo(1f, 1f, 0f, false, true, 6f, 3f)
+            // Solid bookmark.
+            path(fill = SolidColor(Color.White)) {
+                moveTo(6.4f, 2.6f)
+                lineTo(17.6f, 2.6f)
+                arcTo(1.8f, 1.8f, 0f, false, true, 19.4f, 4.4f)
+                lineTo(19.4f, 21.4f)
+                lineTo(12f, 17.1f)
+                lineTo(4.6f, 21.4f)
+                lineTo(4.6f, 4.4f)
+                arcTo(1.8f, 1.8f, 0f, false, true, 6.4f, 2.6f)
                 close()
             }
         }.build()
