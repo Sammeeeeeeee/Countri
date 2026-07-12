@@ -59,7 +59,9 @@ fun WorldMap(
     justAddedIso: String? = null,
     selectedIso: String? = null,
     onCountryTap: ((String) -> Unit)? = null,
+    onModeChange: ((MapMode) -> Unit)? = null,
 ) {
+    val modeChange by androidx.compose.runtime.rememberUpdatedState(onModeChange)
     val palette = LocalCountriPalette.current
     val colors = remember(palette) { MapColors(palette) }
     val renderer = remember(data) { WorldMapRenderer(data) }
@@ -182,6 +184,7 @@ fun WorldMap(
                     var velocityEma = 0f
                     var flatVelXEma = 0f
                     var flatVelYEma = 0f
+                    var globePinch = 1f
                     while (true) {
                         val event = awaitPointerEvent()
                         if (event.changes.none { it.pressed }) break
@@ -200,6 +203,23 @@ fun WorldMap(
                         if (w <= 0f) continue
 
                         if (state.morph.value > 0.5f) {
+                            // Pinching out on the globe unwraps it: hand the
+                            // gesture off to the flat map, centered on what
+                            // was facing you.
+                            if (zoomChange != 1f) globePinch *= zoomChange
+                            val handoff = modeChange
+                            if (globePinch > 1.22f && handoff != null) {
+                                MapProjection.inverseGlobe(w / 2f, h / 2f, w, h, state.rotationDeg)
+                                    ?.let { (lon, lat) ->
+                                        state.centerLon = lon
+                                        state.centerLat = lat
+                                    }
+                                state.zoom = 1.5f
+                                state.clampCamera(w, h)
+                                state.flingVelocity = 0f
+                                handoff(MapMode.Flat)
+                                break
+                            }
                             val r = MapProjection.globeRadius(w, h)
                             val degrees = pan.x / r * 57.29578f
                             state.rotationDeg += degrees

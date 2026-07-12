@@ -44,13 +44,19 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
+import kotlin.math.abs
 import kotlin.math.roundToInt
 import dev.sam.countri.data.catalog.CountryCatalog
 import dev.sam.countri.domain.CountryWithState
@@ -191,12 +197,62 @@ fun AtlasScreen(
             }
         }
 
+        // The journeys list and the tray share every drag: pulling up grows
+        // the tray first, and pulling down past the list's top shrinks it —
+        // so the sheet comes down from anywhere, not just the handle.
+        val trayNested = remember(lowPx, midPx, highPx) {
+            object : NestedScrollConnection {
+                fun nearDetent(): Boolean =
+                    listOf(lowPx, midPx, highPx).any { abs(it - trayHeight.value) < 1f }
+
+                override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                    if (source != NestedScrollSource.UserInput) return Offset.Zero
+                    val dy = available.y
+                    if (dy < 0f && trayHeight.value < highPx - 0.5f) {
+                        val target = (trayHeight.value - dy).coerceAtMost(highPx)
+                        trayScope.launch { trayHeight.snapTo(target) }
+                        return Offset(0f, dy)
+                    }
+                    return Offset.Zero
+                }
+
+                override fun onPostScroll(
+                    consumed: Offset,
+                    available: Offset,
+                    source: NestedScrollSource,
+                ): Offset {
+                    if (source != NestedScrollSource.UserInput) return Offset.Zero
+                    val dy = available.y
+                    if (dy > 0f && trayHeight.value > lowPx + 0.5f) {
+                        val target = (trayHeight.value - dy).coerceAtLeast(lowPx)
+                        trayScope.launch { trayHeight.snapTo(target) }
+                        return Offset(0f, dy)
+                    }
+                    return Offset.Zero
+                }
+
+                override suspend fun onPreFling(available: Velocity): Velocity {
+                    if (!nearDetent()) {
+                        settleTray(available.y)
+                        return available
+                    }
+                    return Velocity.Zero
+                }
+
+                override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
+                    if (!nearDetent()) settleTray(available.y)
+                    return Velocity.Zero
+                }
+            }
+        }
+
         Column(
             Modifier
                 .fillMaxWidth()
                 .height(with(density) { trayHeight.value.toDp() })
                 .clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
                 .background(palette.surface1)
+                .nestedScroll(trayNested)
                 .draggable(
                     orientation = Orientation.Vertical,
                     state = rememberDraggableState { delta ->
@@ -273,7 +329,6 @@ fun AtlasScreen(
                     modifier = Modifier
                         .padding(top = 6.dp)
                         .weight(1f),
-                    userScrollEnabled = trayHigh,
                     contentPadding = PaddingValues(bottom = 100.dp),
                 ) {
                     itemsIndexed(allVisited, key = { _, it -> it.country.iso2 }) { index, entry ->
@@ -293,6 +348,7 @@ private fun AtlasMap(
     viewModel: AtlasViewModel,
     onCountryClick: (String) -> Unit,
 ) {
+    val haptics = LocalHaptics.current
     val countries by viewModel.countries.collectAsState()
     val justAdded by viewModel.justAdded.collectAsState()
     val statuses = remember(countries) {
@@ -310,6 +366,10 @@ private fun AtlasMap(
         onIntroConsumed = { viewModel.introPlayed = true },
         justAddedIso = justAdded,
         onCountryTap = onCountryClick,
+        onModeChange = {
+            haptics.tick()
+            viewModel.mapMode = it
+        },
         modifier = Modifier.fillMaxSize(),
     )
 }

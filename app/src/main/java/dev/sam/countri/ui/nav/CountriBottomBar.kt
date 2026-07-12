@@ -35,7 +35,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.sam.countri.ui.components.CountriIcons
@@ -43,6 +42,7 @@ import dev.sam.countri.ui.components.LocalHaptics
 import dev.sam.countri.ui.theme.Countri
 import dev.sam.countri.ui.theme.CountriType
 import dev.sam.countri.ui.theme.pressScale
+import kotlinx.coroutines.launch
 
 enum class CountriTab { Atlas, Passport, Stats, Wishlist }
 
@@ -133,7 +133,7 @@ fun CountriBottomBar(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         BarItem(
-            icon = CountriIcons.Atlas,
+            tab = CountriTab.Atlas,
             label = "Atlas",
             selected = current == CountriTab.Atlas,
             labelHeight = labelHeight,
@@ -141,7 +141,7 @@ fun CountriBottomBar(
             modifier = Modifier.weight(1f),
         ) { haptics.tick(); onTab(CountriTab.Atlas) }
         BarItem(
-            icon = CountriIcons.Passport,
+            tab = CountriTab.Passport,
             label = "Passport",
             selected = current == CountriTab.Passport,
             labelHeight = labelHeight,
@@ -187,7 +187,7 @@ fun CountriBottomBar(
         }
 
         BarItem(
-            icon = CountriIcons.Stats,
+            tab = CountriTab.Stats,
             label = "Stats",
             selected = current == CountriTab.Stats,
             labelHeight = labelHeight,
@@ -195,7 +195,7 @@ fun CountriBottomBar(
             modifier = Modifier.weight(1f),
         ) { haptics.tick(); onTab(CountriTab.Stats) }
         BarItem(
-            icon = CountriIcons.Wishlist,
+            tab = CountriTab.Wishlist,
             label = "Wishlist",
             selected = current == CountriTab.Wishlist,
             labelHeight = labelHeight,
@@ -208,7 +208,7 @@ fun CountriBottomBar(
 
 @Composable
 private fun BarItem(
-    icon: ImageVector,
+    tab: CountriTab,
     label: String,
     selected: Boolean,
     labelHeight: Dp,
@@ -221,12 +221,19 @@ private fun BarItem(
         targetValue = if (selected) palette.textPrimary else palette.textFaint,
         label = "tabTint",
     )
-    // Little spring pop when the tab becomes active.
+    // Selecting a tab plays its glyph — the pop is just the entrance.
     val pop = remember { Animatable(1f) }
+    val glyph = remember { Animatable(1f) }
     LaunchedEffect(selected) {
         if (selected) {
+            glyph.snapTo(0f)
             pop.snapTo(0.72f)
-            pop.animateTo(1f, spring(dampingRatio = 0.5f, stiffness = 600f))
+            launch { pop.animateTo(1f, spring(dampingRatio = 0.5f, stiffness = 600f)) }
+            glyph.animateTo(1f, spring(dampingRatio = 0.62f, stiffness = 260f))
+        } else {
+            // Tapping away mid-play must never strand the glyph half-drawn.
+            glyph.snapTo(1f)
+            pop.snapTo(1f)
         }
     }
     Column(
@@ -243,10 +250,10 @@ private fun BarItem(
             modifier = Modifier.size(width = 44.dp, height = 26.dp),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(
-                icon,
-                contentDescription = label,
+            TabGlyph(
+                tab = tab,
                 tint = tint,
+                progress = glyph.value,
                 modifier = Modifier
                     .size(21.dp)
                     .graphicsLayer {

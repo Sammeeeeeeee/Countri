@@ -1,55 +1,58 @@
-﻿package dev.sam.countri.ui.share
+package dev.sam.countri.ui.share
 
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
-import android.graphics.Color
 import android.graphics.DashPathEffect
 import android.graphics.Paint
-import android.graphics.Typeface
-import androidx.core.content.res.ResourcesCompat
-import dev.sam.countri.R
 import dev.sam.countri.domain.CountryWithState
-import dev.sam.countri.ui.components.flagEmoji
 import dev.sam.countri.ui.passport.stampRotation
 import kotlin.math.ceil
 import kotlin.math.min
 
 /**
- * The three looks a shared passport card can wear. [accents] is one ink per
- * continent (catalog Continent ordinal order) — each stamp wears its own.
+ * The three looks a share card can wear. Each is the app's own surface
+ * recipe — a canvas, one card floating on it, recessed wells inside.
  */
 enum class ShareStyle(
     val displayName: String,
-    val background: Int,
+    val canvasColor: Int,
+    val card: Int,
+    val well: Int,
     val ink: Int,
-    val accent: Int,
+    val secondary: Int,
     val faint: Int,
-    val accents: IntArray,
+    val hairline: Int,
 ) {
     Light(
         displayName = "Light",
-        background = 0xFFFFFFFF.toInt(),
+        canvasColor = 0xFFF2F2F4.toInt(),
+        card = 0xFFFFFFFF.toInt(),
+        well = 0xFFF2F2F4.toInt(),
         ink = 0xFF1F1F1F.toInt(),
-        accent = 0xFF1F1F1F.toInt(),
-        faint = 0xFF717173.toInt(),
-        accents = IntArray(6) { 0xFF1F1F1F.toInt() },
+        secondary = 0xFF4C4C4C.toInt(),
+        faint = 0xFF9A9A9E.toInt(),
+        hairline = 0x141F1F1F,
     ),
     Dark(
         displayName = "Dark",
-        background = 0xFF1F1F1F.toInt(),
-        ink = 0xFFFFFFFF.toInt(),
-        accent = 0xFFFFFFFF.toInt(),
-        faint = 0xFF9A9A9E.toInt(),
-        accents = IntArray(6) { 0xFFFFFFFF.toInt() },
+        canvasColor = 0xFF141416.toInt(),
+        card = 0xFF1F1F22.toInt(),
+        well = 0xFF2C2C30.toInt(),
+        ink = 0xFFF4F4F5.toInt(),
+        secondary = 0xFFC9C9CE.toInt(),
+        faint = 0xFF8A8A90.toInt(),
+        hairline = 0x1FFFFFFF,
     ),
     Mist(
         displayName = "Mist",
-        background = 0xFFF7F7F7.toInt(),
+        canvasColor = 0xFFFFFFFF.toInt(),
+        card = 0xFFF2F2F4.toInt(),
+        well = 0xFFFFFFFF.toInt(),
         ink = 0xFF1F1F1F.toInt(),
-        accent = 0xFF4C4C4C.toInt(),
-        faint = 0xFF717173.toInt(),
-        accents = IntArray(6) { 0xFF4C4C4C.toInt() },
+        secondary = 0xFF4C4C4C.toInt(),
+        faint = 0xFF9A9A9E.toInt(),
+        hairline = 0x141F1F1F,
     ),
 }
 
@@ -59,121 +62,84 @@ enum class ShareStyle(
  */
 object PassportCardRenderer {
 
-    const val WIDTH = 1080
-    const val HEIGHT = 1350
+    const val WIDTH = CARD_W
+    const val HEIGHT = CARD_H
     private const val COLUMNS = 4
-    private const val MARGIN = 84f
 
     fun render(context: Context, stamps: List<CountryWithState>, style: ShareStyle): Bitmap {
         val bitmap = Bitmap.createBitmap(WIDTH, HEIGHT, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(bitmap)
-        val display = interTypeface(context, 500)
-        val mono = interTypeface(context, 600)
-
-        canvas.drawColor(style.background)
-
-        val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+        val c = CardScope(context, Canvas(bitmap), style)
+        c.frame()
 
         // ---- header ----
-        paint.typeface = mono
-        paint.textSize = 30f
-        paint.letterSpacing = 0.32f
-        paint.color = style.accent
-        canvas.drawText("COUNTRI · PASSPORT", MARGIN, 150f, paint)
+        c.text("PASSPORT", PAD, 176f, c.label, 28f, style.faint, tracking = 0.15f)
+        val title = if (stamps.size == 1) "1 country" else "${stamps.size} countries"
+        c.text(title, PAD, 296f, c.display, 96f, style.ink, tracking = -0.022f)
 
-        paint.typeface = display
-        paint.textSize = 96f
-        paint.letterSpacing = -0.02f
-        paint.color = style.ink
         val years = stamps.mapNotNull { it.firstYear }
-        val title = when (stamps.size) {
-            1 -> "1 country"
-            else -> "${stamps.size} countries"
-        }
-        canvas.drawText(title, MARGIN, 268f, paint)
-
-        paint.typeface = mono
-        paint.textSize = 34f
-        paint.letterSpacing = 0.06f
-        paint.color = style.faint
         val range = when {
             years.isEmpty() -> "a record of everywhere"
             years.min() == years.max() -> "in ${years.min()}"
             else -> "${years.min()} — ${years.max()}"
         }
-        canvas.drawText(range, MARGIN, 328f, paint)
+        c.text(range, PAD, 362f, c.body, 40f, style.secondary)
 
         // ---- stamp grid ----
-        val gridTop = 420f
-        val gridBottom = HEIGHT - 130f
-        val cell = (WIDTH - MARGIN * 2f) / COLUMNS
+        val gridTop = 430f
+        val gridBottom = 1170f
+        val gridLeft = PAD - 24f
+        val cell = (WIDTH - gridLeft * 2f) / COLUMNS
         val rows = ceil(stamps.size / COLUMNS.toFloat()).toInt().coerceAtLeast(1)
         val cellH = min(cell, (gridBottom - gridTop) / rows)
 
         stamps.forEachIndexed { i, entry ->
             val col = i % COLUMNS
             val row = i / COLUMNS
-            val cx = MARGIN + cell * col + cell / 2f
+            val cx = gridLeft + cell * col + cell / 2f
             val cy = gridTop + cellH * row + cellH / 2f
             if (cy + cellH / 2f > gridBottom + 1f) return@forEachIndexed
-            drawStamp(canvas, entry, cx, cy, min(cell, cellH) / 2f - 14f, style, display, mono)
+            drawStamp(c, entry, cx, cy, min(cell, cellH) / 2f - 14f, style)
         }
 
-        // ---- footer ----
-        paint.typeface = mono
-        paint.textSize = 28f
-        paint.letterSpacing = 0.24f
-        paint.color = style.faint
-        canvas.drawText("MADE WITH COUNTRI", MARGIN, HEIGHT - 64f, paint)
-
+        c.wordmark()
         return bitmap
     }
 
     private fun drawStamp(
-        canvas: Canvas,
+        c: CardScope,
         entry: CountryWithState,
         cx: Float,
         cy: Float,
         radius: Float,
         style: ShareStyle,
-        display: Typeface,
-        mono: Typeface,
     ) {
         val paint = Paint(Paint.ANTI_ALIAS_FLAG)
-        val ink = style.accents[entry.country.continent.ordinal]
-        canvas.save()
-        canvas.rotate(stampRotation(entry.country.iso2), cx, cy)
+        c.canvas.save()
+        c.canvas.rotate(stampRotation(entry.country.iso2), cx, cy)
+
+        // Same recipe as the on-screen stamp: recessed backing, ink rings.
+        paint.style = Paint.Style.FILL
+        paint.color = style.well
+        c.canvas.drawCircle(cx, cy, radius, paint)
 
         paint.style = Paint.Style.STROKE
-        paint.color = ink
-        paint.alpha = 135
+        paint.color = style.ink
+        paint.alpha = 120
         paint.strokeWidth = 3.6f
-        canvas.drawCircle(cx, cy, radius, paint)
+        c.canvas.drawCircle(cx, cy, radius, paint)
 
-        paint.alpha = 80
+        paint.alpha = 66
         paint.strokeWidth = 2.4f
         paint.pathEffect = DashPathEffect(floatArrayOf(10f, 10f), 0f)
-        canvas.drawCircle(cx, cy, radius - 14f, paint)
+        c.canvas.drawCircle(cx, cy, radius - 16f, paint)
         paint.pathEffect = null
 
-        paint.style = Paint.Style.FILL
-        paint.typeface = Typeface.DEFAULT // emoji flags come from the system font
-        paint.textAlign = Paint.Align.CENTER
-        paint.textSize = radius * 0.56f
-        paint.color = ink
-        canvas.drawText(flagEmoji(entry.country.iso2), cx, cy + radius * 0.16f, paint)
-        paint.typeface = mono
-        paint.letterSpacing = 0.04f
-
-        paint.textSize = radius * 0.2f
-        paint.letterSpacing = 0.1f
-        paint.alpha = 190
-        canvas.drawText(
+        c.flag(entry.country.iso2, cx, cy + radius * 0.14f, radius * 0.56f)
+        c.text(
             entry.firstYear?.toString() ?: "·",
-            cx,
-            cy + radius * 0.46f,
-            paint,
+            cx, cy + radius * 0.52f, c.label, radius * 0.2f, style.faint,
+            tracking = 0.08f, align = Paint.Align.CENTER,
         )
-        canvas.restore()
+        c.canvas.restore()
     }
 }

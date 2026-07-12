@@ -41,6 +41,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.util.lerp
 import dev.sam.countri.ui.share.PassportShareSheet
 import dev.sam.countri.domain.CountryWithState
 import dev.sam.countri.ui.AtlasViewModel
@@ -53,6 +54,7 @@ import dev.sam.countri.ui.theme.Springs
 import dev.sam.countri.ui.theme.pressScale
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlin.math.abs
 
 /** Deterministic stamp tilt, straight from the country code. */
 fun stampRotation(iso2: String): Float =
@@ -187,6 +189,8 @@ private fun Stamp(
     }
     var topIndex by remember(entry.country.iso2) { mutableStateOf(0) }
     val swipeX = remember { Animatable(0f) }
+    // 0 = pile at rest, 1 = every stamp has moved up one place in the stack.
+    val shift = remember(entry.country.iso2) { Animatable(0f) }
     val swipeScope = rememberCoroutineScope()
 
     // Stamp hit: starts big and transparent, slams down with overshoot.
@@ -209,20 +213,22 @@ private fun Stamp(
             },
         contentAlignment = Alignment.Center,
     ) {
-        // The rest of the pile peeks out from behind.
+        // The rest of the pile peeks out from behind; as the front face
+        // leaves, everyone slides one place forward instead of teleporting.
         val behind = (years.size - 1).coerceAtMost(2)
         for (k in behind downTo 1) {
             StampFace(
                 iso2 = entry.country.iso2,
                 year = years[(topIndex + k) % years.size],
                 accent = accent,
-                faceAlpha = 0.35f / k,
+                faceAlpha = lerp(0.35f / k, if (k == 1) 1f else 0.35f / (k - 1), shift.value),
                 modifier = Modifier
                     .fillMaxSize()
                     .graphicsLayer {
-                        translationX = 7.dp.toPx() * k
-                        translationY = -5.dp.toPx() * k
-                        rotationZ = stampRotation(entry.country.iso2) + 6f * k
+                        val pos = k - shift.value
+                        translationX = 7.dp.toPx() * pos
+                        translationY = -5.dp.toPx() * pos
+                        rotationZ = stampRotation(entry.country.iso2) + 6f * pos
                     },
             )
         }
@@ -235,7 +241,8 @@ private fun Stamp(
                 .fillMaxSize()
                 .graphicsLayer {
                     translationX = swipeX.value
-                    rotationZ = stampRotation(entry.country.iso2) + swipeX.value / 22f
+                    rotationZ = stampRotation(entry.country.iso2) + swipeX.value / 20f
+                    this.alpha = 1f - (abs(swipeX.value) / (size.width * 1.1f)).coerceIn(0f, 0.95f)
                 }
                 .pressScale(0.92f)
                 .clickable(
@@ -251,21 +258,33 @@ private fun Stamp(
                             onHorizontalDrag = { change, delta ->
                                 change.consume()
                                 total += delta
-                                swipeScope.launch { swipeX.snapTo(total * 0.6f) }
+                                val drag = total * 0.7f
+                                swipeScope.launch {
+                                    swipeX.snapTo(drag)
+                                    // The pile leans forward while you pull.
+                                    shift.snapTo(
+                                        (abs(drag) / (size.width * 0.9f)).coerceAtMost(0.4f)
+                                    )
+                                }
                             },
                             onDragEnd = {
-                                if (kotlin.math.abs(total) > 42f) {
+                                if (abs(total) > size.width * 0.16f) {
                                     haptics.tick()
+                                    val fly = size.width * 1.25f * (if (total > 0) 1f else -1f)
                                     swipeScope.launch {
-                                        swipeX.animateTo(
-                                            if (total > 0) 90f else -90f,
-                                            Springs.Fast,
-                                        )
+                                        val pile = launch { shift.animateTo(1f, Springs.Fast) }
+                                        swipeX.animateTo(fly, Springs.Fast)
+                                        pile.join()
+                                        // The pile is exactly one place along; swap and reset.
                                         topIndex = (topIndex + 1) % years.size
                                         swipeX.snapTo(0f)
+                                        shift.snapTo(0f)
                                     }
                                 } else {
-                                    swipeScope.launch { swipeX.animateTo(0f, Springs.Bouncy) }
+                                    swipeScope.launch {
+                                        launch { shift.animateTo(0f, Springs.Bouncy) }
+                                        swipeX.animateTo(0f, Springs.Bouncy)
+                                    }
                                 }
                             },
                         )
