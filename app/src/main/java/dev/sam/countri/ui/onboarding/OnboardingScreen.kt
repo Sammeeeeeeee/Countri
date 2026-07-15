@@ -8,8 +8,6 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -41,6 +39,7 @@ import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import dev.sam.countri.ui.AtlasViewModel
 import dev.sam.countri.ui.components.LocalHaptics
+import dev.sam.countri.ui.components.tapTarget
 import dev.sam.countri.ui.map.MapMode
 import dev.sam.countri.ui.map.WorldMap
 import dev.sam.countri.ui.theme.Countri
@@ -168,10 +167,7 @@ fun OnboardingScreen(
                     .pressScale(0.97f)
                     .clip(CircleShape)
                     .background(palette.visited)
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                    ) {
+                    .tapTarget {
                         haptics.tick()
                         if (step >= slides.lastIndex) {
                             haptics.confirm()
@@ -230,10 +226,7 @@ fun OnboardingScreen(
                     color = palette.textFaint,
                     modifier = Modifier
                         .clip(RoundedCornerShape(8.dp))
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null,
-                        ) { onDone() }
+                        .tapTarget { onDone() }
                         .padding(8.dp),
                 )
             }

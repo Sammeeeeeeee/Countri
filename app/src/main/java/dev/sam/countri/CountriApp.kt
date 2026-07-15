@@ -16,7 +16,7 @@ import dev.sam.countri.data.repo.AtlasRepository
 class AppContainer(private val app: Application) {
     val database: AppDatabase by lazy { AppDatabase.build(app) }
     val repository: AtlasRepository by lazy {
-        AtlasRepository(database.countryStateDao(), database.visitDao())
+        AtlasRepository(database, database.countryStateDao(), database.visitDao())
     }
     val onboardingPrefs: OnboardingPrefs by lazy { OnboardingPrefs(app) }
     val worldMap: WorldMapData by lazy {

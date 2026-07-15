@@ -1,8 +1,6 @@
 package dev.sam.countri.ui.detail
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,6 +24,7 @@ import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.SelectableDates
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
@@ -46,6 +45,7 @@ import dev.sam.countri.domain.Visit
 import dev.sam.countri.ui.components.CountriIcons
 import dev.sam.countri.ui.components.LocalHaptics
 import dev.sam.countri.ui.components.SectionLabel
+import dev.sam.countri.ui.components.tapTarget
 import dev.sam.countri.ui.share.VisitCardRenderer
 import dev.sam.countri.ui.share.shareBitmap
 import dev.sam.countri.ui.theme.Countri
@@ -53,6 +53,7 @@ import dev.sam.countri.ui.theme.CountriType
 import dev.sam.countri.ui.theme.pressScale
 import java.time.Instant
 import java.time.LocalDate
+import java.time.Year
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 
@@ -86,6 +87,9 @@ fun AddVisitSheet(
     var showDatePicker by remember { mutableStateOf(false) }
     var cities by remember(existing) { mutableStateOf(existing?.cities ?: emptyList()) }
     var draft by remember { mutableStateOf("") }
+    // Guards against a double-tap on Save firing two inserts before the sheet
+    // has had a frame to dismiss.
+    var saving by remember { mutableStateOf(false) }
 
     // Big cities appear immediately; typing narrows them.
     val suggestions = remember(draft, cities) {
@@ -137,10 +141,7 @@ fun AddVisitSheet(
                             .pressScale(0.9f)
                             .clip(CircleShape)
                             .background(palette.recessed)
-                            .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null,
-                            ) {
+                            .tapTarget(onClickLabel = "Share this visit") {
                                 haptics.tick()
                                 shareBitmap(
                                     context,
@@ -185,10 +186,7 @@ fun AddVisitSheet(
                                 modifier = Modifier
                                     .padding(start = 6.dp)
                                     .size(14.dp)
-                                    .clickable(
-                                        interactionSource = remember { MutableInteractionSource() },
-                                        indication = null,
-                                    ) { cities = cities - city },
+                                    .tapTarget(onClickLabel = "Remove $city") { cities = cities - city },
                             )
                         }
                     }
@@ -231,10 +229,7 @@ fun AddVisitSheet(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable(
-                                    interactionSource = remember { MutableInteractionSource() },
-                                    indication = null,
-                                ) { addCity(city.name) }
+                                .tapTarget(onClickLabel = "Add ${city.name}") { addCity(city.name) }
                                 .padding(horizontal = 14.dp, vertical = 10.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
@@ -270,10 +265,7 @@ fun AddVisitSheet(
                         .pressScale(0.97f)
                         .clip(RoundedCornerShape(16.dp))
                         .background(palette.recessed)
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null,
-                        ) { showDatePicker = true }
+                        .tapTarget(onClickLabel = "Change start date") { showDatePicker = true }
                         .padding(14.dp),
                 ) {
                     Text(start.format(dateFormat), style = CountriType.subtitle, color = palette.textPrimary)
@@ -285,7 +277,7 @@ fun AddVisitSheet(
                     )
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    StepButton("−") { if (days > 1) { days--; haptics.tick() } }
+                    StepButton("−", "One fewer day") { if (days > 1) { days--; haptics.tick() } }
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         modifier = Modifier.padding(horizontal = 12.dp),
@@ -297,7 +289,7 @@ fun AddVisitSheet(
                             color = palette.textFaint,
                         )
                     }
-                    StepButton("+") { if (days < 365) { days++; haptics.tick() } }
+                    StepButton("+", "One more day") { if (days < 365) { days++; haptics.tick() } }
                 }
             }
 
@@ -310,10 +302,9 @@ fun AddVisitSheet(
                     .pressScale(0.97f)
                     .clip(CircleShape)
                     .background(palette.visited)
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                    ) {
+                    .tapTarget(onClickLabel = if (existing != null) "Save visit" else "Save trip") {
+                        if (saving) return@tapTarget
+                        saving = true
                         if (draft.isNotBlank()) addCity(draft)
                         haptics.confirm()
                         onSave(start, end, cities)
@@ -330,8 +321,15 @@ fun AddVisitSheet(
     }
 
     if (showDatePicker) {
+        // A trip can't start in the future — bound the picker to today and back.
+        val nowMillis = System.currentTimeMillis()
+        val thisYear = Year.now().value
         val pickerState = rememberDatePickerState(
             initialSelectedDateMillis = start.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli(),
+            selectableDates = object : SelectableDates {
+                override fun isSelectableDate(utcTimeMillis: Long): Boolean = utcTimeMillis <= nowMillis
+                override fun isSelectableYear(year: Int): Boolean = year <= thisYear
+            },
         )
         DatePickerDialog(
             onDismissRequest = { showDatePicker = false },
@@ -358,7 +356,7 @@ fun AddVisitSheet(
 }
 
 @Composable
-private fun StepButton(glyph: String, onClick: () -> Unit) {
+private fun StepButton(glyph: String, clickLabel: String, onClick: () -> Unit) {
     val palette = Countri.palette
     Box(
         modifier = Modifier
@@ -366,11 +364,7 @@ private fun StepButton(glyph: String, onClick: () -> Unit) {
             .pressScale(0.9f)
             .clip(CircleShape)
             .background(palette.recessed)
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                onClick = onClick,
-            ),
+            .tapTarget(onClickLabel = clickLabel, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
         Text(glyph, style = CountriType.subtitle, color = palette.textPrimary)

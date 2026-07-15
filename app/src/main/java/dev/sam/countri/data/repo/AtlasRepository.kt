@@ -1,7 +1,9 @@
 package dev.sam.countri.data.repo
 
+import androidx.room.withTransaction
 import dev.sam.countri.data.backup.Backup
 import dev.sam.countri.data.catalog.CountryCatalog
+import dev.sam.countri.data.db.AppDatabase
 import dev.sam.countri.data.db.CountryStateDao
 import dev.sam.countri.data.db.CountryStateEntity
 import dev.sam.countri.data.db.VisitDao
@@ -18,6 +20,7 @@ import java.time.LocalDate
  * catalog joined with the user's country rows and visit records.
  */
 class AtlasRepository(
+    private val db: AppDatabase,
     private val dao: CountryStateDao,
     private val visitDao: VisitDao,
 ) {
@@ -31,12 +34,13 @@ class AtlasRepository(
                 val hasVisits = visitsByIso.containsKey(country.iso2)
                 CountryWithState(
                     country = country,
-                    // Recorded trips outrank any stored status: a country
-                    // with visits can never demote to wishlist.
-                    status = if (hasVisits) CountryStatus.VISITED
-                    else row?.status?.let {
-                        runCatching { CountryStatus.valueOf(it) }.getOrNull()
-                    },
+                    // One source of truth for status: the stored row wins
+                    // whenever it exists, so an explicit Wishlist is honoured
+                    // even while dormant visit records sit behind it. Visits
+                    // only imply Visited for a country with no row at all
+                    // (untracked), never overriding a stored value.
+                    status = row?.status?.let { runCatching { CountryStatus.valueOf(it) }.getOrNull() }
+                        ?: if (hasVisits) CountryStatus.VISITED else null,
                     firstVisitYear = row?.firstVisitYear,
                     note = row?.note,
                     places = row?.tags ?: emptyList(),
@@ -75,11 +79,14 @@ class AtlasRepository(
         cities: List<String>,
         existing: CountryWithState?,
     ) {
+        // Guard the range at the boundary so no invalid visit ever reaches the
+        // table: a visit spans at least its start day.
+        val safeEnd = if (end.isBefore(start)) start else end
         visitDao.insert(
             VisitEntity(
                 iso2 = iso2,
                 startDay = start.toEpochDay(),
-                endDay = end.toEpochDay(),
+                endDay = safeEnd.toEpochDay(),
                 cities = cities.map { it.trim() }.filter { it.isNotEmpty() },
             )
         )
@@ -95,12 +102,13 @@ class AtlasRepository(
         end: LocalDate,
         cities: List<String>,
     ) {
+        val safeEnd = if (end.isBefore(start)) start else end
         visitDao.update(
             VisitEntity(
                 id = id,
                 iso2 = iso2,
                 startDay = start.toEpochDay(),
-                endDay = end.toEpochDay(),
+                endDay = safeEnd.toEpochDay(),
                 cities = cities.map { it.trim() }.filter { it.isNotEmpty() },
             )
         )
@@ -128,7 +136,8 @@ class AtlasRepository(
         )
     }
 
-    suspend fun clear(iso2: String) {
+    /** Removes a country's row and every visit under it, atomically. */
+    suspend fun clear(iso2: String) = db.withTransaction {
         visitDao.deleteAllFor(iso2)
         dao.delete(iso2)
     }
@@ -136,27 +145,65 @@ class AtlasRepository(
     suspend fun exportBackup(): String =
         Backup.encode(dao.allOnce(), visitDao.allOnce())
 
-    /** Replaces everything with the backup's contents. */
+    /**
+     * Replaces everything with the backup's contents — atomically, and only
+     * after the document has been validated. The whole swap runs in one
+     * transaction, so a crash mid-import can never leave a half-restored or
+     * empty atlas: it either fully applies or the old data survives untouched.
+     */
     suspend fun importBackup(text: String) {
+        // Parse and reject unsupported versions BEFORE deleting anything.
         val data = Backup.decode(text)
-        dao.deleteAll()
-        visitDao.deleteAll()
-        data.states.forEach { s ->
-            dao.upsert(
-                CountryStateEntity(
-                    iso2 = s.iso2,
-                    status = s.status,
-                    firstVisitYear = s.firstVisitYear,
-                    note = s.note,
-                    tags = s.tags,
-                    trips = s.trips,
+
+        val validIso = CountryCatalog.all.mapTo(HashSet()) { it.iso2 }
+        val validStatus = CountryStatus.entries.mapTo(HashSet()) { it.name }
+
+        // Drop rows the app can't represent rather than storing invisible junk
+        // that would only bloat the DB and re-export forever.
+        val states = data.states.filter { it.iso2 in validIso && it.status in validStatus }
+        val visits = data.visits
+            .filter { it.iso2 in validIso }
+            .map { if (it.endDay < it.startDay) it.copy(endDay = it.startDay) else it }
+
+        db.withTransaction {
+            dao.deleteAll()
+            visitDao.deleteAll()
+            states.forEach { s ->
+                dao.upsert(
+                    CountryStateEntity(
+                        iso2 = s.iso2,
+                        status = s.status,
+                        firstVisitYear = s.firstVisitYear,
+                        note = s.note,
+                        tags = s.tags,
+                        trips = s.trips,
+                    )
                 )
-            )
-        }
-        visitDao.insertAll(
-            data.visits.map { v ->
-                VisitEntity(iso2 = v.iso2, startDay = v.startDay, endDay = v.endDay, cities = v.cities)
             }
-        )
+            visitDao.insertAll(
+                visits.map { v ->
+                    VisitEntity(iso2 = v.iso2, startDay = v.startDay, endDay = v.endDay, cities = v.cities)
+                }
+            )
+            // Keep the DB self-consistent: a country that has visits but no
+            // stored row is marked Visited, matching how the app writes its
+            // own data. A country that carries an explicit row (e.g. Wishlist)
+            // is left exactly as the backup recorded it.
+            val stated = states.mapTo(HashSet()) { it.iso2 }
+            visits.mapTo(HashSet()) { it.iso2 }.forEach { iso ->
+                if (iso !in stated) {
+                    dao.upsert(
+                        CountryStateEntity(
+                            iso2 = iso,
+                            status = CountryStatus.VISITED.name,
+                            firstVisitYear = null,
+                            note = null,
+                            tags = emptyList(),
+                            trips = 0,
+                        )
+                    )
+                }
+            }
+        }
     }
 }

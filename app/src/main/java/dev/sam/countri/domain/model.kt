@@ -12,7 +12,13 @@ data class Visit(
     val end: LocalDate,
     val cities: List<String>,
 ) {
-    val days: Int get() = (end.toEpochDay() - start.toEpochDay() + 1).toInt()
+    /**
+     * Inclusive length in days. Floored at 1: a visit always spans at least
+     * the day it happened, and this keeps a corrupt or hand-edited range
+     * (end before start) from ever contributing a zero or negative day count
+     * to the timeline totals.
+     */
+    val days: Int get() = (end.toEpochDay() - start.toEpochDay() + 1).toInt().coerceAtLeast(1)
 }
 
 data class CountryWithState(

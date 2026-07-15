@@ -3,8 +3,6 @@ package dev.sam.countri.ui.share
 import android.content.Intent
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -39,6 +37,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import dev.sam.countri.domain.CountryWithState
 import dev.sam.countri.ui.components.LocalHaptics
+import dev.sam.countri.ui.components.tapTarget
 import dev.sam.countri.ui.theme.Countri
 import dev.sam.countri.ui.theme.CountriType
 import dev.sam.countri.ui.theme.hairline
@@ -101,10 +100,7 @@ fun PassportShareSheet(
                         Modifier
                             .weight(1f)
                             .pressScale(0.96f)
-                            .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null,
-                            ) {
+                            .tapTarget {
                                 haptics.tick()
                                 selected = style
                             },
@@ -157,10 +153,7 @@ fun PassportShareSheet(
                     .pressScale(0.97f)
                     .clip(CircleShape)
                     .background(palette.visited)
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                    ) {
+                    .tapTarget {
                         haptics.confirm()
                         shareCard(context, stamps, selected)
                         onDismiss()

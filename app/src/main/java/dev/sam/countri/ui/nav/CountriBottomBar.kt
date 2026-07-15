@@ -7,8 +7,6 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -35,10 +33,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.sam.countri.ui.components.CountriIcons
 import dev.sam.countri.ui.components.LocalHaptics
+import dev.sam.countri.ui.components.tapTarget
 import dev.sam.countri.ui.theme.Countri
 import dev.sam.countri.ui.theme.CountriType
 import dev.sam.countri.ui.theme.pressScale
@@ -154,10 +154,7 @@ fun CountriBottomBar(
             modifier = Modifier
                 .weight(1f)
                 .pressScale(0.9f)
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                ) { haptics.tick(); onAdd() },
+                .tapTarget(onClickLabel = "Add a country") { haptics.tick(); onAdd() },
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Box(
@@ -239,11 +236,7 @@ private fun BarItem(
     Column(
         modifier = modifier
             .pressScale(0.92f)
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                onClick = onClick,
-            ),
+            .tapTarget(role = Role.Tab, onClickLabel = "Open $label", onClick = onClick),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Box(
