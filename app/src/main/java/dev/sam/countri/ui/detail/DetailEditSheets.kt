@@ -1,8 +1,6 @@
 package dev.sam.countri.ui.detail
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -43,6 +41,7 @@ import dev.sam.countri.data.wiki.WikiSearch
 import dev.sam.countri.domain.CountryWithState
 import dev.sam.countri.ui.components.CountriIcons
 import dev.sam.countri.ui.components.LocalHaptics
+import dev.sam.countri.ui.components.tapTarget
 import dev.sam.countri.ui.theme.Countri
 import dev.sam.countri.ui.theme.CountriType
 import dev.sam.countri.ui.theme.MonoFamily
@@ -109,11 +108,7 @@ private fun SaveButton(text: String = "Save", onClick: () -> Unit) {
             .pressScale(0.97f)
             .clip(CircleShape)
             .background(palette.visited)
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                onClick = onClick,
-            ),
+            .tapTarget(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
         Text(text, style = CountriType.body, color = palette.onVisited)
@@ -146,10 +141,7 @@ private fun YearEditor(entry: CountryWithState, onSave: (Int) -> Unit) {
                     .pressScale(0.93f)
                     .clip(CircleShape)
                     .background(if (isSelected) palette.visited else palette.recessed)
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                    ) {
+                    .tapTarget {
                         haptics.confirm()
                         onSave(year)
                     }
@@ -208,11 +200,7 @@ private fun StepperButton(glyph: String, onClick: () -> Unit) {
             .pressScale(0.9f)
             .clip(CircleShape)
             .background(palette.recessed)
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                onClick = onClick,
-            ),
+            .tapTarget(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
         Text(glyph, style = CountriType.subtitle, color = palette.textPrimary)
@@ -273,10 +261,7 @@ private fun PlacesEditor(entry: CountryWithState, onSave: (List<String>) -> Unit
                         modifier = Modifier
                             .padding(start = 6.dp)
                             .size(14.dp)
-                            .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null,
-                            ) {
+                            .tapTarget {
                                 places = places - place
                                 haptics.tick()
                             },
@@ -324,10 +309,7 @@ private fun PlacesEditor(entry: CountryWithState, onSave: (List<String>) -> Unit
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null,
-                        ) { add(suggestion.title) }
+                        .tapTarget { add(suggestion.title) }
                         .padding(horizontal = 14.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -362,10 +344,7 @@ private fun PlacesEditor(entry: CountryWithState, onSave: (List<String>) -> Unit
                     color = accent,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null,
-                        ) { add(draft) }
+                        .tapTarget { add(draft) }
                         .padding(horizontal = 14.dp, vertical = 10.dp),
                 )
             }

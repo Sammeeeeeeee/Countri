@@ -7,11 +7,9 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -65,6 +63,7 @@ import dev.sam.countri.ui.components.CodeBadge
 import dev.sam.countri.ui.components.CountriIcons
 import dev.sam.countri.ui.components.LocalHaptics
 import dev.sam.countri.ui.components.SectionLabel
+import dev.sam.countri.ui.components.tapTarget
 import dev.sam.countri.ui.map.MapMode
 import dev.sam.countri.ui.map.WorldMap
 import dev.sam.countri.ui.theme.Countri
@@ -274,10 +273,7 @@ fun AtlasScreen(
                     .size(width = 36.dp, height = 4.dp)
                     .clip(CircleShape)
                     .background(palette.textPrimary.copy(alpha = 0.15f))
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                    ) {
+                    .tapTarget {
                         trayScope.launch {
                             trayHeight.animateTo(
                                 if (trayHigh) midPx else highPx,
@@ -300,10 +296,7 @@ fun AtlasScreen(
                 Row(
                     modifier = Modifier
                         .clip(RoundedCornerShape(8.dp))
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null,
-                        ) { onSeePassport() }
+                        .tapTarget { onSeePassport() }
                         .padding(4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -426,11 +419,7 @@ private fun ToggleChip(
         modifier = Modifier
             .size(width = width, height = height)
             .clip(CircleShape)
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                onClick = onClick,
-            ),
+            .tapTarget(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
         Text(text, style = CountriType.mono, color = fg)
@@ -480,11 +469,7 @@ private fun RecentRow(
         modifier = Modifier
             .fillMaxWidth()
             .pressScale(0.98f)
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                onClick = onClick,
-            )
+            .tapTarget(onClick = onClick)
             .drawBehind {
                 if (showDivider) {
                     drawRect(

@@ -2,8 +2,6 @@ package dev.sam.countri.ui.share
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -37,6 +35,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import dev.sam.countri.domain.AtlasStats
 import dev.sam.countri.ui.components.LocalHaptics
+import dev.sam.countri.ui.components.tapTarget
 import dev.sam.countri.ui.theme.Countri
 import dev.sam.countri.ui.theme.CountriType
 import dev.sam.countri.ui.theme.pressScale
@@ -147,10 +146,7 @@ fun StatsShareSheet(
                     .pressScale(0.97f)
                     .clip(CircleShape)
                     .background(palette.visited)
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                    ) {
+                    .tapTarget {
                         haptics.confirm()
                         shareBitmap(
                             context,
@@ -177,11 +173,7 @@ private fun OptionChip(text: String, selected: Boolean, onClick: () -> Unit) {
             .pressScale(0.97f)
             .clip(CircleShape)
             .background(if (selected) palette.visited else palette.recessed)
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                onClick = onClick,
-            )
+            .tapTarget(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 9.dp),
     ) {
         Text(

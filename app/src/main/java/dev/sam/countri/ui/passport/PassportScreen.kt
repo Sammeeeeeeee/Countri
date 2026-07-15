@@ -3,9 +3,7 @@
 import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -48,6 +46,7 @@ import dev.sam.countri.ui.AtlasViewModel
 import dev.sam.countri.ui.components.CountriIcons
 import dev.sam.countri.ui.components.LocalHaptics
 import dev.sam.countri.ui.components.flagEmoji
+import dev.sam.countri.ui.components.tapTarget
 import dev.sam.countri.ui.theme.Countri
 import dev.sam.countri.ui.theme.CountriType
 import dev.sam.countri.ui.theme.Springs
@@ -107,10 +106,7 @@ fun PassportScreen(
                         .pressScale(0.9f)
                         .clip(CircleShape)
                         .background(palette.surface1)
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null,
-                        ) { showShare = true },
+                        .tapTarget { showShare = true },
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
@@ -245,11 +241,7 @@ private fun Stamp(
                     this.alpha = 1f - (abs(swipeX.value) / (size.width * 1.1f)).coerceIn(0f, 0.95f)
                 }
                 .pressScale(0.92f)
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                    onClick = onClick,
-                )
+                .tapTarget(onClick = onClick)
                 .then(
                     if (years.size > 1) Modifier.pointerInput(years.size) {
                         var total = 0f

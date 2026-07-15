@@ -2,8 +2,6 @@ package dev.sam.countri.ui.add
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -38,6 +36,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import dev.sam.countri.domain.CountryStatus
@@ -46,6 +45,7 @@ import dev.sam.countri.ui.AtlasViewModel
 import dev.sam.countri.ui.components.CodeBadge
 import dev.sam.countri.ui.components.CountriIcons
 import dev.sam.countri.ui.components.LocalHaptics
+import dev.sam.countri.ui.components.tapTarget
 import dev.sam.countri.ui.map.MapMode
 import dev.sam.countri.ui.theme.Countri
 import dev.sam.countri.ui.theme.CountriType
@@ -107,10 +107,7 @@ fun AddCountryScreen(
                     .pressScale(0.9f)
                     .clip(RoundedCornerShape(12.dp))
                     .background(palette.surface1)
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                    ) { onClose() },
+                    .tapTarget(onClickLabel = "Close") { onClose() },
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
@@ -224,11 +221,7 @@ private fun CountryRow(
             .fillMaxWidth()
             .pressScale(0.98f)
             .clip(RoundedCornerShape(16.dp))
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                onClick = onClick,
-            )
+            .tapTarget(onClick = onClick)
             .padding(horizontal = 8.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(14.dp),
@@ -341,10 +334,7 @@ private fun QuickAddSheet(
                     .pressScale(0.97f)
                     .clip(CircleShape)
                     .background(palette.visited)
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                    ) {
+                    .tapTarget(onClickLabel = "Add to atlas") {
                         scope.launch {
                             sheetState.hide()
                             onConfirm(chosen)
@@ -391,11 +381,7 @@ private fun StatusChoice(
             .pressScale(0.96f)
             .clip(CircleShape)
             .background(bg)
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                onClick = onClick,
-            ),
+            .tapTarget(role = Role.RadioButton, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
         Text(text, style = CountriType.body, color = fg)

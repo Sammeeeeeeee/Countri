@@ -2,8 +2,6 @@ package dev.sam.countri.ui.wishlist
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -31,6 +29,7 @@ import androidx.compose.ui.unit.sp
 import dev.sam.countri.ui.AtlasViewModel
 import dev.sam.countri.ui.components.CountriIcons
 import dev.sam.countri.ui.components.flagEmoji
+import dev.sam.countri.ui.components.tapTarget
 import dev.sam.countri.ui.theme.Countri
 import dev.sam.countri.ui.theme.CountriType
 import dev.sam.countri.ui.theme.pressScale
@@ -102,10 +101,7 @@ fun WishlistScreen(
                             .pressScale(0.98f)
                             .clip(RoundedCornerShape(20.dp))
                             .background(palette.surface1)
-                            .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null,
-                            ) { onCountryClick(entry.country.iso2) }
+                            .tapTarget { onCountryClick(entry.country.iso2) }
                             .padding(16.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(16.dp),

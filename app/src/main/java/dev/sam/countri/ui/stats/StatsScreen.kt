@@ -7,8 +7,6 @@ import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -54,6 +52,7 @@ import dev.sam.countri.ui.components.CountriIcons
 import dev.sam.countri.ui.components.LocalHaptics
 import dev.sam.countri.ui.components.SectionLabel
 import dev.sam.countri.ui.components.flagEmoji
+import dev.sam.countri.ui.components.tapTarget
 import dev.sam.countri.ui.share.StatsShareSheet
 import dev.sam.countri.ui.theme.Countri
 import dev.sam.countri.ui.theme.CountriType
@@ -113,10 +112,7 @@ fun StatsScreen(viewModel: AtlasViewModel) {
                     .pressScale(0.9f)
                     .clip(CircleShape)
                     .background(palette.surface1)
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                    ) {
+                    .tapTarget {
                         haptics.tick()
                         showShare = true
                     },
@@ -359,11 +355,7 @@ private fun DataRow(title: String, subtitle: String, onClick: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .pressScale(0.98f)
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                onClick = onClick,
-            )
+            .tapTarget(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 13.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {

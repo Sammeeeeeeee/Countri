@@ -1,5 +1,6 @@
 package dev.sam.countri.data.backup
 
+import dev.sam.countri.data.CountriJson
 import dev.sam.countri.data.db.CountryStateEntity
 import dev.sam.countri.data.db.VisitEntity
 import kotlinx.serialization.Serializable
@@ -30,20 +31,25 @@ data class BackupVisit(
 
 @Serializable
 data class BackupData(
-    val version: Int = 1,
+    // Required, deliberately: a foreign JSON document that merely happens to
+    // parse (an unrelated file, a fragment) has no version field and is
+    // rejected here, instead of decoding to an empty atlas that would wipe the
+    // user's data on restore.
+    val version: Int,
     val states: List<BackupState> = emptyList(),
     val visits: List<BackupVisit> = emptyList(),
 )
 
 object Backup {
-    private val json = Json {
-        ignoreUnknownKeys = true
-        prettyPrint = true
-    }
+    /** Bump when the on-disk shape changes in a way older builds can't read. */
+    const val CURRENT_VERSION = 1
+
+    private val json = Json(from = CountriJson) { prettyPrint = true }
 
     fun encode(states: List<CountryStateEntity>, visits: List<VisitEntity>): String =
         json.encodeToString(
             BackupData(
+                version = CURRENT_VERSION,
                 states = states.map {
                     BackupState(it.iso2, it.status, it.firstVisitYear, it.note, it.tags, it.trips)
                 },
@@ -53,5 +59,17 @@ object Backup {
             )
         )
 
-    fun decode(text: String): BackupData = json.decodeFromString(text)
+    /**
+     * Parse a backup document, refusing anything this build can't safely
+     * restore. A file from a newer, incompatible format is rejected here —
+     * before the caller touches the existing data — so a bad import can never
+     * wipe the atlas and leave nothing in its place.
+     */
+    fun decode(text: String): BackupData {
+        val data = json.decodeFromString<BackupData>(text)
+        require(data.version in 1..CURRENT_VERSION) {
+            "Unsupported backup version ${data.version}"
+        }
+        return data
+    }
 }

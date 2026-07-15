@@ -2,8 +2,6 @@ package dev.sam.countri.ui.detail
 
 import android.content.Intent
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -46,6 +44,7 @@ import dev.sam.countri.ui.components.CountriIcons
 import dev.sam.countri.ui.components.LocalHaptics
 import dev.sam.countri.ui.components.SectionLabel
 import dev.sam.countri.ui.components.flagEmoji
+import dev.sam.countri.ui.components.tapTarget
 import dev.sam.countri.ui.map.CityMarker
 import dev.sam.countri.ui.map.CountrySilhouette
 import dev.sam.countri.ui.share.CountryCardRenderer
@@ -113,10 +112,7 @@ fun CountryDetailScreen(
                     .pressScale(0.9f)
                     .clip(CircleShape)
                     .background(palette.surface1.copy(alpha = 0.92f))
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                    ) { onBack() },
+                    .tapTarget(onClickLabel = "Go back") { onBack() },
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
@@ -136,10 +132,7 @@ fun CountryDetailScreen(
                         .pressScale(0.9f)
                         .clip(CircleShape)
                         .background(palette.surface1.copy(alpha = 0.92f))
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null,
-                        ) {
+                        .tapTarget(onClickLabel = "Share " + entry.country.name) {
                             haptics.tick()
                             shareBitmap(
                                 context,
@@ -248,10 +241,7 @@ fun CountryDetailScreen(
                                 .pressScale(0.96f)
                                 .clip(CircleShape)
                                 .background(palette.surface1)
-                                .clickable(
-                                    interactionSource = remember { MutableInteractionSource() },
-                                    indication = null,
-                                ) {
+                                .tapTarget(onClickLabel = "Open $place on Wikipedia") {
                                     haptics.tick()
                                     context.startActivity(
                                         Intent(Intent.ACTION_VIEW, WikiSearch.pageUrl(place).toUri())
@@ -279,10 +269,7 @@ fun CountryDetailScreen(
                             .pressScale(0.94f)
                             .clip(CircleShape)
                             .background(palette.surface1)
-                            .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null,
-                            ) { editTarget = EditTarget.Places }
+                            .tapTarget(onClickLabel = "Add places") { editTarget = EditTarget.Places }
                             .padding(horizontal = 15.dp, vertical = 8.dp),
                     )
                 }
@@ -303,8 +290,10 @@ fun CountryDetailScreen(
                     haptics.tick()
                     showAddVisit = true
                 }
-                // A country with recorded trips can't go back to dreaming.
-                if (entry.visits.isEmpty() && !entry.isWishlist) {
+                // Demote to wishlist even after trips are logged. The visit
+                // records stay dormant behind the status and reappear if the
+                // country is marked visited again, so nothing is lost.
+                if (!entry.isWishlist) {
                     ActionButton(
                         text = "Wishlist",
                         primary = false,
@@ -321,12 +310,11 @@ fun CountryDetailScreen(
                             .pressScale(0.94f)
                             .clip(CircleShape)
                             .background(palette.surface1)
-                            .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null,
-                            ) {
-                                val hasData = entry.places.isNotEmpty() ||
-                                    (entry.isVisited && entry.trips > 1)
+                            .tapTarget(onClickLabel = "Remove ${entry.country.name} from atlas") {
+                                // Confirm whenever removal would destroy real
+                                // data — places or any trip record, even ones
+                                // sitting dormant behind a wishlist status.
+                                val hasData = entry.places.isNotEmpty() || entry.visits.isNotEmpty()
                                 if (hasData) confirmClear = true else {
                                     haptics.reject()
                                     viewModel.clear(iso2)
@@ -440,11 +428,7 @@ private fun VisitCard(
             .pressScale(0.98f)
             .clip(RoundedCornerShape(20.dp))
             .background(palette.surface1)
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                onClick = onClick,
-            )
+            .tapTarget(onClickLabel = "Edit visit", onClick = onClick)
             .padding(14.dp)
     ) {
         Row(
@@ -470,11 +454,7 @@ private fun VisitCard(
                     .pressScale(0.88f)
                     .clip(CircleShape)
                     .background(palette.recessed)
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                        onClick = onDelete,
-                    ),
+                    .tapTarget(onClickLabel = "Delete visit", onClick = onDelete),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
@@ -510,11 +490,7 @@ private fun StatCard(
             .pressScale(0.97f)
             .clip(RoundedCornerShape(20.dp))
             .background(palette.surface1)
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                onClick = onClick,
-            )
+            .tapTarget(onClick = onClick)
             .padding(15.dp),
     ) {
         Text(
@@ -545,11 +521,7 @@ private fun ActionButton(
             .pressScale(0.96f)
             .clip(CircleShape)
             .background(if (primary) palette.visited else palette.surface1)
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                onClick = onClick,
-            ),
+            .tapTarget(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
         Text(
