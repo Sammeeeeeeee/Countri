@@ -343,7 +343,7 @@ fun StatsScreen(viewModel: AtlasViewModel) {
                 .clip(RoundedCornerShape(20.dp))
                 .background(palette.surface1)
         ) {
-            DataRow("Back up", "Save everything as a file — Drive, anywhere") {
+            DataRow("Back up", "Save everything as a file") {
                 exportLauncher.launch("countri-backup.json")
             }
             DataRow("Restore", "Replace this atlas with a backup file") {

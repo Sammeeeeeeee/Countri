@@ -163,6 +163,7 @@ fun CountriNavHost(
                 viewModel = viewModel,
                 onCountryClick = { iso -> navController.navigate(DetailRoute(iso)) },
                 onSeePassport = { navController.navigateToTab(CountriTab.Passport) },
+                onSeeStats = { navController.navigateToTab(CountriTab.Stats) },
                 onBarCompact = onBarCompact,
             )
         }

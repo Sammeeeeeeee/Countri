@@ -79,6 +79,7 @@ fun AtlasScreen(
     viewModel: AtlasViewModel,
     onCountryClick: (String) -> Unit,
     onSeePassport: () -> Unit,
+    onSeeStats: () -> Unit = {},
     onBarCompact: (Boolean) -> Unit = {},
 ) {
     val palette = Countri.palette
@@ -173,12 +174,18 @@ fun AtlasScreen(
             AtlasMap(viewModel, onCountryClick)
 
             // The one chromatic element in the whole app: the cobalt ribbon.
+            // It's also the door to the stats page.
             Row(
                 Modifier
                     .align(Alignment.BottomStart)
                     .padding(start = 22.dp, bottom = 18.dp)
+                    .pressScale(0.95f)
                     .clip(CircleShape)
                     .background(Brush.horizontalGradient(palette.aurora))
+                    .tapTarget(onClickLabel = "See your stats") {
+                        haptics.tick()
+                        onSeeStats()
+                    }
                     .padding(horizontal = 16.dp, vertical = 9.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {

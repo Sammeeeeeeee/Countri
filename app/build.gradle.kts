@@ -24,8 +24,8 @@ android {
         applicationId = "dev.sam.countri"
         minSdk = 29
         targetSdk = 35
-        versionCode = 4
-        versionName = "0.4"
+        versionCode = 5
+        versionName = "1.0"
     }
 
     if (keystoreProps.isNotEmpty()) {
