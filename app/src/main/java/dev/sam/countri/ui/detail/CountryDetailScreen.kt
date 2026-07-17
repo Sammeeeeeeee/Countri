@@ -236,7 +236,7 @@ fun CountryDetailScreen(
                     horizontalArrangement = Arrangement.spacedBy(9.dp),
                     verticalArrangement = Arrangement.spacedBy(9.dp),
                 ) {
-                    entry.places.forEach { place ->
+                    entry.places.sortedBy { it.lowercase() }.forEach { place ->
                         Row(
                             modifier = Modifier
                                 .pressScale(0.96f)

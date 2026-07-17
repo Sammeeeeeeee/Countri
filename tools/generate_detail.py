@@ -180,19 +180,19 @@ def build_country(raw_rings, budget):
         lons = [p[0] for p in r]
         lats = [p[1] for p in r]
         span = max(span, max(lons) - min(lons), max(lats) - min(lats))
-    tol = max(span / 2600.0, 0.0008)
-    for _ in range(12):
+    tol = max(span / 3000.0, 0.0008)
+    for _ in range(16):
         rings = [simplify_ring(r, tol) for r in keep_rings]
         rings = [r for r in rings if len(r) >= 4]
         if sum(len(r) for r in rings) <= budget:
             return rings
-        tol *= 1.45
+        tol *= 1.3
     return rings  # last attempt, slightly over budget — acceptable
 
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--budget", type=int, default=2600,
+    ap.add_argument("--budget", type=int, default=4000,
                     help="max vertices per country")
     args = ap.parse_args()
 

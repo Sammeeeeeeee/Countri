@@ -91,16 +91,41 @@ fun CountrySilhouette(
             labelPaint.textSize = 10.5f * density
             labelPaint.color = palette.textFaint.toArgb()
             labelPaint.alpha = (255 * alpha).toInt()
-            cityMarkers.forEach { marker ->
+            dotPaint.color = palette.canvas.toArgb()
+            dotPaint.alpha = (255 * alpha).toInt()
+            // Labels place themselves greedily — right of the dot first,
+            // then left, below, above — and drop out rather than overlap.
+            val placed = ArrayList<RectF>(cityMarkers.size)
+            val projected = cityMarkers.map { marker ->
                 point[0] = geometry.unwrap(marker.lon) * geometry.lonScale
                 point[1] = -marker.lat
                 matrix.mapPoints(point)
-                val px = point[0]
-                val py = point[1]
-                dotPaint.color = palette.canvas.toArgb()
-                dotPaint.alpha = (255 * alpha).toInt()
+                Triple(marker.name, point[0], point[1])
+            }.sortedBy { it.third }
+            projected.forEach { (name, px, py) ->
                 canvas.drawCircle(px, py, 3.4f * density, dotPaint)
-                canvas.drawText(marker.name, px + 6.5f * density, py + 3.5f * density, labelPaint)
+                val tw = labelPaint.measureText(name)
+                val th = 11f * density
+                val candidates = arrayOf(
+                    floatArrayOf(px + 6.5f * density, py + 3.5f * density),
+                    floatArrayOf(px - 6.5f * density - tw, py + 3.5f * density),
+                    floatArrayOf(px - tw / 2f, py + 15f * density),
+                    floatArrayOf(px - tw / 2f, py - 8f * density),
+                )
+                val spot = candidates.firstOrNull { (x, base) ->
+                    val r = RectF(x - 2f, base - th, x + tw + 2f, base + 3f * density)
+                    r.left >= 0f && r.right <= w && r.top >= 0f && r.bottom <= h &&
+                        placed.none { RectF.intersects(it, r) }
+                }
+                if (spot != null) {
+                    placed.add(
+                        RectF(
+                            spot[0] - 2f, spot[1] - th,
+                            spot[0] + tw + 2f, spot[1] + 3f * density,
+                        )
+                    )
+                    canvas.drawText(name, spot[0], spot[1], labelPaint)
+                }
             }
         }
     }
@@ -117,10 +142,13 @@ private class CountryGeometry(
 
 private class RingBox(
     val points: FloatArray, // flat lon/lat pairs
-    val centerLon: Float,
-    val centerLat: Float,
-    val span: Float,
-)
+    val minLon: Float,
+    val maxLon: Float,
+    val minLat: Float,
+    val maxLat: Float,
+) {
+    val span: Float get() = maxOf(maxLon - minLon, maxLat - minLat)
+}
 
 /** This country's raw rings: the 10m asset when it knows the country, else the world map. */
 private fun countryRings(
@@ -174,9 +202,10 @@ private fun buildGeometry(
         rings.add(
             RingBox(
                 points = ring,
-                centerLon = (minLon + maxLon) / 2f,
-                centerLat = (minLat + maxLat) / 2f,
-                span = maxOf(maxLon - minLon, maxLat - minLat),
+                minLon = minLon,
+                maxLon = maxLon,
+                minLat = minLat,
+                maxLat = maxLat,
             )
         )
         if (minLon < globalMinLon) globalMinLon = minLon
@@ -186,15 +215,43 @@ private fun buildGeometry(
     val wrap = globalMaxLon - globalMinLon > 180f
     fun unwrap(lon: Float) = if (wrap && lon < 0f) lon + 360f else lon
 
-    // The hero shows the recognizable mainland: keep the biggest landmass
-    // and anything near it (Corsica yes, French Guiana no).
+    // The hero shows the recognizable country: the biggest landmass, any
+    // second landmass in its size class (East Malaysia, Alaska), and the
+    // islands that hug the kept coast. Distant specks — Svalbard, the
+    // Canaries, Galápagos — stay off the plate instead of stretching it.
     val main = rings.maxBy { it.span }
-    val reach = maxOf(main.span * 1.6f, 14f)
-    val kept = rings.filter { info ->
-        val dLon = unwrap(info.centerLon) - unwrap(main.centerLon)
-        val dLat = info.centerLat - main.centerLat
-        dLon * dLon + dLat * dLat <= reach * reach
+    val keptMask = BooleanArray(rings.size)
+    rings.forEachIndexed { i, r ->
+        if (r === main || r.span >= main.span * 0.45f) keptMask[i] = true
     }
+
+    fun gap2(a: RingBox, b: RingBox): Float {
+        val dx = maxOf(
+            0f,
+            unwrap(a.minLon) - unwrap(b.maxLon),
+            unwrap(b.minLon) - unwrap(a.maxLon),
+        )
+        val dy = maxOf(0f, a.minLat - b.maxLat, b.minLat - a.maxLat)
+        return dx * dx + dy * dy
+    }
+
+    // Chain outward: anything within 2 degrees of the kept coast joins.
+    var grew = true
+    while (grew) {
+        grew = false
+        for (i in rings.indices) {
+            if (keptMask[i]) continue
+            for (j in rings.indices) {
+                if (!keptMask[j]) continue
+                if (gap2(rings[i], rings[j]) <= 4f) {
+                    keptMask[i] = true
+                    grew = true
+                    break
+                }
+            }
+        }
+    }
+    val kept = rings.filterIndexed { i, _ -> keptMask[i] }
 
     var minLat = Float.MAX_VALUE
     var maxLat = -Float.MAX_VALUE

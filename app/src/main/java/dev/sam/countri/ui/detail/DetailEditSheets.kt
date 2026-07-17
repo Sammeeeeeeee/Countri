@@ -246,7 +246,7 @@ private fun PlacesEditor(entry: CountryWithState, onSave: (List<String>) -> Unit
             verticalArrangement = Arrangement.spacedBy(9.dp),
             modifier = Modifier.padding(bottom = 14.dp),
         ) {
-            places.forEach { place ->
+            places.sortedBy { it.lowercase() }.forEach { place ->
                 Row(
                     modifier = Modifier
                         .clip(CircleShape)
