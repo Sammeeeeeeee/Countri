@@ -4,6 +4,8 @@ import android.app.Application
 import dev.sam.countri.data.cities.CityCatalog
 import dev.sam.countri.data.cities.CityData
 import dev.sam.countri.data.db.AppDatabase
+import dev.sam.countri.data.map.DetailMapAsset
+import dev.sam.countri.data.map.DetailMapData
 import dev.sam.countri.data.map.WorldMapAsset
 import dev.sam.countri.data.map.WorldMapData
 import dev.sam.countri.data.prefs.OnboardingPrefs
@@ -21,6 +23,9 @@ class AppContainer(private val app: Application) {
     val onboardingPrefs: OnboardingPrefs by lazy { OnboardingPrefs(app) }
     val worldMap: WorldMapData by lazy {
         app.assets.open("worldmap.bin").use { WorldMapAsset.parse(it.readBytes()) }
+    }
+    val detailMap: DetailMapData by lazy {
+        app.assets.open("detailmap.bin").use { DetailMapAsset.parse(it.readBytes()) }
     }
     val cities: CityData by lazy {
         app.assets.open("cities.bin").use { CityCatalog.parse(it.readBytes()) }

@@ -36,8 +36,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.unit.dp
-import dev.sam.countri.data.wiki.WikiPlace
-import dev.sam.countri.data.wiki.WikiSearch
+import dev.sam.countri.data.places.FoundPlace
+import dev.sam.countri.data.places.PlaceSearch
 import dev.sam.countri.domain.CountryWithState
 import dev.sam.countri.ui.components.CountriIcons
 import dev.sam.countri.ui.components.LocalHaptics
@@ -215,9 +215,10 @@ private fun PlacesEditor(entry: CountryWithState, onSave: (List<String>) -> Unit
     val accent = palette.continentColor(entry.country.continent)
     var places by rememberSaveable { mutableStateOf(entry.places) }
     var draft by rememberSaveable { mutableStateOf("") }
-    var suggestions by remember { mutableStateOf<List<WikiPlace>>(emptyList()) }
+    var suggestions by remember { mutableStateOf<List<FoundPlace>>(emptyList()) }
 
-    // Search-as-you-type against Wikipedia, debounced.
+    // Search-as-you-type against OpenStreetMap, debounced and scoped to the
+    // country — only real places come back, no lookalike articles.
     LaunchedEffect(draft) {
         val q = draft.trim()
         if (q.length < 2) {
@@ -225,7 +226,7 @@ private fun PlacesEditor(entry: CountryWithState, onSave: (List<String>) -> Unit
             return@LaunchedEffect
         }
         delay(280)
-        suggestions = WikiSearch.search(q)
+        suggestions = PlaceSearch.search(q, entry.country.iso2)
     }
 
     fun add(name: String) {
@@ -296,7 +297,7 @@ private fun PlacesEditor(entry: CountryWithState, onSave: (List<String>) -> Unit
         },
     )
 
-    // Wikipedia suggestions — tap to add; saved places open their page.
+    // Place suggestions — tap to add; saved places open on the map.
     if (suggestions.isNotEmpty() || draft.trim().length >= 2) {
         Column(
             Modifier
@@ -309,19 +310,19 @@ private fun PlacesEditor(entry: CountryWithState, onSave: (List<String>) -> Unit
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .tapTarget { add(suggestion.title) }
+                        .tapTarget { add(suggestion.name) }
                         .padding(horizontal = 14.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Column(Modifier.weight(1f)) {
                         Text(
-                            suggestion.title,
+                            suggestion.name,
                             style = CountriType.body,
                             color = palette.textPrimary,
                         )
-                        if (!suggestion.description.isNullOrBlank()) {
+                        if (!suggestion.kind.isNullOrBlank()) {
                             Text(
-                                suggestion.description,
+                                suggestion.kind,
                                 style = CountriType.bodySmall,
                                 color = palette.textFaint,
                                 maxLines = 1,
@@ -336,7 +337,7 @@ private fun PlacesEditor(entry: CountryWithState, onSave: (List<String>) -> Unit
                     )
                 }
             }
-            val exact = suggestions.any { it.title.equals(draft.trim(), ignoreCase = true) }
+            val exact = suggestions.any { it.name.equals(draft.trim(), ignoreCase = true) }
             if (draft.trim().length >= 2 && !exact) {
                 Text(
                     "Add “${draft.trim()}”",

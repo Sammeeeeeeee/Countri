@@ -32,15 +32,16 @@ class AtlasRepository(
             CountryCatalog.all.map { country ->
                 val row = byIso[country.iso2]
                 val hasVisits = visitsByIso.containsKey(country.iso2)
+                val stored = row?.status?.let { runCatching { CountryStatus.valueOf(it) }.getOrNull() }
                 CountryWithState(
                     country = country,
-                    // One source of truth for status: the stored row wins
-                    // whenever it exists, so an explicit Wishlist is honoured
-                    // even while dormant visit records sit behind it. Visits
-                    // only imply Visited for a country with no row at all
-                    // (untracked), never overriding a stored value.
-                    status = row?.status?.let { runCatching { CountryStatus.valueOf(it) }.getOrNull() }
-                        ?: if (hasVisits) CountryStatus.VISITED else null,
+                    // Visits always mean visited; the wishlist is no longer a
+                    // rival state but a flag that rides alongside, so nothing
+                    // needs to win a fight here anymore.
+                    status = when {
+                        stored == CountryStatus.VISITED || hasVisits -> CountryStatus.VISITED
+                        else -> stored
+                    },
                     firstVisitYear = row?.firstVisitYear,
                     note = row?.note,
                     places = row?.tags ?: emptyList(),
@@ -53,6 +54,8 @@ class AtlasRepository(
                             cities = v.cities,
                         )
                     },
+                    // Belt and braces for rows written before the v4 column.
+                    wishlisted = row?.wishlisted == true || stored == CountryStatus.WISHLIST,
                 )
             }
         }
@@ -67,6 +70,32 @@ class AtlasRepository(
                 note = existing?.note,
                 tags = existing?.places ?: emptyList(),
                 trips = existing?.trips ?: 0,
+                wishlisted = if (status == CountryStatus.WISHLIST) true
+                else existing?.wishlisted == true,
+            )
+        )
+    }
+
+    /**
+     * Flips the wishlist flag without touching visited-ness. Un-wishing a
+     * country that carries nothing else removes its row entirely, so the
+     * atlas never accumulates empty husks.
+     */
+    suspend fun setWishlisted(iso2: String, wishlisted: Boolean, existing: CountryWithState?) {
+        val visited = existing?.isVisited == true
+        if (!wishlisted && !visited) {
+            clear(iso2)
+            return
+        }
+        dao.upsert(
+            CountryStateEntity(
+                iso2 = iso2,
+                status = if (visited) CountryStatus.VISITED.name else CountryStatus.WISHLIST.name,
+                firstVisitYear = existing?.firstVisitYear,
+                note = existing?.note,
+                tags = existing?.places ?: emptyList(),
+                trips = existing?.trips ?: 0,
+                wishlisted = wishlisted,
             )
         )
     }
@@ -132,6 +161,7 @@ class AtlasRepository(
                 note = note?.takeUnless { it.isBlank() },
                 tags = places.map { it.trim() }.filter { it.isNotEmpty() },
                 trips = trips.coerceIn(0, 999),
+                wishlisted = current.wishlisted,
             )
         )
     }
@@ -168,15 +198,19 @@ class AtlasRepository(
         db.withTransaction {
             dao.deleteAll()
             visitDao.deleteAll()
+            val visited = visits.mapTo(HashSet()) { it.iso2 }
             states.forEach { s ->
                 dao.upsert(
                     CountryStateEntity(
                         iso2 = s.iso2,
-                        status = s.status,
+                        // Visits mean visited, whatever an old backup says.
+                        status = if (s.iso2 in visited) CountryStatus.VISITED.name else s.status,
                         firstVisitYear = s.firstVisitYear,
                         note = s.note,
                         tags = s.tags,
                         trips = s.trips,
+                        // Older backups carried wishlist as the status itself.
+                        wishlisted = s.wishlisted ?: (s.status == CountryStatus.WISHLIST.name),
                     )
                 )
             }
@@ -187,10 +221,9 @@ class AtlasRepository(
             )
             // Keep the DB self-consistent: a country that has visits but no
             // stored row is marked Visited, matching how the app writes its
-            // own data. A country that carries an explicit row (e.g. Wishlist)
-            // is left exactly as the backup recorded it.
+            // own data.
             val stated = states.mapTo(HashSet()) { it.iso2 }
-            visits.mapTo(HashSet()) { it.iso2 }.forEach { iso ->
+            visited.forEach { iso ->
                 if (iso !in stated) {
                     dao.upsert(
                         CountryStateEntity(

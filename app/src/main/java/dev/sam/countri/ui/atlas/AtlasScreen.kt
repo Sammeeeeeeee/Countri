@@ -66,6 +66,9 @@ import dev.sam.countri.ui.components.SectionLabel
 import dev.sam.countri.ui.components.tapTarget
 import dev.sam.countri.ui.map.MapMode
 import dev.sam.countri.ui.map.WorldMap
+import dev.sam.countri.ui.share.AtlasCardRenderer
+import dev.sam.countri.ui.share.ShareStyle
+import dev.sam.countri.ui.share.shareBitmap
 import dev.sam.countri.ui.theme.Countri
 import dev.sam.countri.ui.theme.CountriType
 import dev.sam.countri.ui.theme.hairline
@@ -127,6 +130,45 @@ fun AtlasScreen(
                 .weight(1f)
         ) {
             AtlasMap(viewModel, onCountryClick)
+
+            // Share the coverage map itself, in the card language.
+            val context = androidx.compose.ui.platform.LocalContext.current
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(end = 20.dp, top = 8.dp)
+                    .size(38.dp)
+                    .pressScale(0.9f)
+                    .clip(CircleShape)
+                    .background(palette.surface1)
+                    .tapTarget(onClickLabel = "Share your atlas") {
+                        haptics.tick()
+                        val visitedIdx = countries
+                            .filter { it.isVisited }
+                            .map { CountryCatalog.indexOf(it.country.iso2) }
+                            .toSet()
+                        shareBitmap(
+                            context,
+                            AtlasCardRenderer.render(
+                                context,
+                                viewModel.worldMap,
+                                visitedIdx,
+                                stats,
+                                if (palette.isDark) ShareStyle.Dark else ShareStyle.Light,
+                            ),
+                            "countri-atlas.png",
+                            "Share your atlas",
+                        )
+                    },
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    CountriIcons.Share,
+                    contentDescription = "Share your atlas",
+                    tint = palette.textSecondary,
+                    modifier = Modifier.size(17.dp),
+                )
+            }
 
             // The one chromatic element in the whole app: the cobalt ribbon.
             Row(

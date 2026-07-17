@@ -1,6 +1,9 @@
 ﻿package dev.sam.countri.ui.passport
 
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutLinearInEasing
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -54,6 +57,7 @@ import dev.sam.countri.ui.theme.pressScale
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.abs
+import kotlin.math.sign
 
 /** Deterministic stamp tilt, straight from the country code. */
 fun stampRotation(iso2: String): Float =
@@ -190,10 +194,13 @@ private fun Stamp(
     val swipeScope = rememberCoroutineScope()
 
     // Stamp hit: starts big and transparent, slams down with overshoot.
-    val scale = remember(entry.country.iso2) { Animatable(2.3f) }
-    val alpha = remember(entry.country.iso2) { Animatable(0f) }
+    // Stamps past the first screenful skip the theatre — scrolling a long
+    // passport has to show pages instantly.
+    val scale = remember(entry.country.iso2) { Animatable(if (index > 17) 1f else 2.3f) }
+    val alpha = remember(entry.country.iso2) { Animatable(if (index > 17) 1f else 0f) }
     LaunchedEffect(entry.country.iso2) {
-        delay(index.coerceAtMost(17) * 55L)
+        if (index > 17) return@LaunchedEffect
+        delay(index * 55L)
         if (index < 8) haptics.tick()
         launch { alpha.animateTo(1f, Springs.Fast) }
         scale.animateTo(1f, Springs.Bouncy)
@@ -217,7 +224,11 @@ private fun Stamp(
                 iso2 = entry.country.iso2,
                 year = years[(topIndex + k) % years.size],
                 accent = accent,
-                faceAlpha = lerp(0.35f / k, if (k == 1) 1f else 0.35f / (k - 1), shift.value),
+                faceAlpha = lerp(
+                    0.35f / k,
+                    if (k == 1) 1f else 0.35f / (k - 1),
+                    shift.value.coerceIn(0f, 1f),
+                ),
                 modifier = Modifier
                     .fillMaxSize()
                     .graphicsLayer {
@@ -225,6 +236,13 @@ private fun Stamp(
                         translationX = 7.dp.toPx() * pos
                         translationY = -5.dp.toPx() * pos
                         rotationZ = stampRotation(entry.country.iso2) + 6f * pos
+                        if (k == 1) {
+                            // The incoming face grows into place and lands
+                            // with the pile spring's little overshoot.
+                            val grow = lerp(0.94f, 1f, shift.value.coerceIn(0f, 1f))
+                            scaleX = grow
+                            scaleY = grow
+                        }
                     },
             )
         }
@@ -237,35 +255,59 @@ private fun Stamp(
                 .fillMaxSize()
                 .graphicsLayer {
                     translationX = swipeX.value
-                    rotationZ = stampRotation(entry.country.iso2) + swipeX.value / 20f
-                    this.alpha = 1f - (abs(swipeX.value) / (size.width * 1.1f)).coerceIn(0f, 0.95f)
+                    rotationZ = stampRotation(entry.country.iso2) + swipeX.value / 14f
+                    // Stay solid while flying; only vanish near the end.
+                    val leave = (abs(swipeX.value) / (size.width * 1.15f)).coerceIn(0f, 1f)
+                    this.alpha = 1f - ((leave - 0.55f).coerceAtLeast(0f) / 0.45f)
                 }
                 .pressScale(0.92f)
                 .tapTarget(onClick = onClick)
                 .then(
                     if (years.size > 1) Modifier.pointerInput(years.size) {
                         var total = 0f
+                        var lastMs = 0L
+                        var vel = 0f
                         detectHorizontalDragGestures(
-                            onDragStart = { total = 0f },
+                            onDragStart = { total = swipeX.value; vel = 0f; lastMs = 0L },
                             onHorizontalDrag = { change, delta ->
                                 change.consume()
                                 total += delta
-                                val drag = total * 0.7f
+                                val now = change.uptimeMillis
+                                val dt = (now - lastMs).coerceAtLeast(1)
+                                if (lastMs != 0L) vel = vel * 0.75f + (delta / dt * 1000f) * 0.25f
+                                lastMs = now
                                 swipeScope.launch {
-                                    swipeX.snapTo(drag)
-                                    // The pile leans forward while you pull.
+                                    // 1:1 under the finger — a card in the hand,
+                                    // not an elastic band.
+                                    swipeX.snapTo(total)
                                     shift.snapTo(
-                                        (abs(drag) / (size.width * 0.9f)).coerceAtMost(0.4f)
+                                        (abs(total) / (size.width * 1.6f)).coerceAtMost(0.5f)
                                     )
                                 }
                             },
                             onDragEnd = {
-                                if (abs(total) > size.width * 0.16f) {
+                                val w = size.width.toFloat()
+                                val flick = abs(vel) > 900f
+                                val past = abs(total) > w * 0.3f
+                                // A flick back cancels even from past the line.
+                                val commit = flick || (past && !(vel * total < 0f && abs(vel) > 500f))
+                                if (commit) {
                                     haptics.tick()
-                                    val fly = size.width * 1.25f * (if (total > 0) 1f else -1f)
+                                    val dir = if (flick) sign(vel) else sign(total)
+                                    val fly = w * 1.15f * (if (dir >= 0f) 1f else -1f)
                                     swipeScope.launch {
-                                        val pile = launch { shift.animateTo(1f, Springs.Fast) }
-                                        swipeX.animateTo(fly, Springs.Fast)
+                                        // Accelerate away like a dealt card while
+                                        // the pile springs up with a pop.
+                                        val pile = launch {
+                                            shift.animateTo(
+                                                1f,
+                                                spring(dampingRatio = 0.6f, stiffness = 700f),
+                                            )
+                                        }
+                                        swipeX.animateTo(
+                                            fly,
+                                            tween(170, easing = FastOutLinearInEasing),
+                                        )
                                         pile.join()
                                         // The pile is exactly one place along; swap and reset.
                                         topIndex = (topIndex + 1) % years.size
@@ -275,7 +317,7 @@ private fun Stamp(
                                 } else {
                                     swipeScope.launch {
                                         launch { shift.animateTo(0f, Springs.Bouncy) }
-                                        swipeX.animateTo(0f, Springs.Bouncy)
+                                        swipeX.animateTo(0f, Springs.Bouncy, initialVelocity = vel)
                                     }
                                 }
                             },

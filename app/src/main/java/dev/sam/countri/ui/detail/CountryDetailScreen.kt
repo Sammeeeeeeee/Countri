@@ -36,7 +36,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
-import dev.sam.countri.data.wiki.WikiSearch
 import dev.sam.countri.domain.CountryStatus
 import dev.sam.countri.ui.AtlasViewModel
 import androidx.compose.ui.unit.sp
@@ -100,6 +99,7 @@ fun CountryDetailScreen(
                 data = viewModel.worldMap,
                 iso2 = iso2,
                 cityMarkers = markers,
+                detail = viewModel.detailMap,
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(horizontal = 26.dp, vertical = 14.dp),
@@ -156,11 +156,12 @@ fun CountryDetailScreen(
         // ---- Identity ----
         Column(Modifier.padding(horizontal = 22.dp)) {
             Text(
-                text = when (entry.status) {
-                    CountryStatus.VISITED -> "Visited"
-                    CountryStatus.WISHLIST -> "On the wishlist"
-                    null -> "Not yet"
-                } + "  ·  " + entry.country.continent.displayName,
+                text = buildList {
+                    if (entry.isVisited) add("Visited")
+                    if (entry.isWishlist) add("Wishlisted")
+                    if (isEmpty()) add("Not yet")
+                    add(entry.country.continent.displayName)
+                }.joinToString("  ·  "),
                 style = CountriType.bodySmall,
                 color = palette.textFaint,
             )
@@ -241,10 +242,16 @@ fun CountryDetailScreen(
                                 .pressScale(0.96f)
                                 .clip(CircleShape)
                                 .background(palette.surface1)
-                                .tapTarget(onClickLabel = "Open $place on Wikipedia") {
+                                .tapTarget(onClickLabel = "Open $place on the map") {
                                     haptics.tick()
+                                    val query = android.net.Uri.encode(
+                                        "$place, ${entry.country.name}"
+                                    )
                                     context.startActivity(
-                                        Intent(Intent.ACTION_VIEW, WikiSearch.pageUrl(place).toUri())
+                                        Intent(
+                                            Intent.ACTION_VIEW,
+                                            "https://www.google.com/maps/search/?api=1&query=$query".toUri(),
+                                        )
                                     )
                                 }
                                 .padding(horizontal = 14.dp, vertical = 8.dp),
@@ -290,18 +297,15 @@ fun CountryDetailScreen(
                     haptics.tick()
                     showAddVisit = true
                 }
-                // Demote to wishlist even after trips are logged. The visit
-                // records stay dormant behind the status and reappear if the
-                // country is marked visited again, so nothing is lost.
-                if (!entry.isWishlist) {
-                    ActionButton(
-                        text = "Wishlist",
-                        primary = false,
-                        modifier = Modifier.weight(1f),
-                    ) {
-                        haptics.confirm()
-                        viewModel.setStatus(iso2, CountryStatus.WISHLIST)
-                    }
+                // Wishlist is a flag, not a rival state: a visited country
+                // can stay on the list for the next trip.
+                ActionButton(
+                    text = if (entry.isWishlist) "Wishlisted ✓" else "Wishlist",
+                    primary = false,
+                    modifier = Modifier.weight(1f),
+                ) {
+                    if (entry.isWishlist) haptics.tick() else haptics.confirm()
+                    viewModel.setWishlisted(iso2, !entry.isWishlist)
                 }
                 if (entry.status != null) {
                     Box(

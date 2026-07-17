@@ -13,6 +13,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -248,7 +250,13 @@ fun StatsScreen(viewModel: AtlasViewModel) {
             SectionLabel("Timeline", Modifier.padding(horizontal = 22.dp))
             Column(Modifier.padding(horizontal = 22.dp).padding(top = 14.dp, bottom = 30.dp)) {
                 stats.timeline.forEachIndexed { index, group ->
-                    Row(Modifier.staggeredEnter(index)) {
+                    Row(
+                        Modifier
+                            .staggeredEnter(index)
+                            // The spine must span however tall the row grows,
+                            // so the line never breaks between years.
+                            .height(IntrinsicSize.Min)
+                    ) {
                         Text(
                             group.year.toString(),
                             style = CountriType.subtitle.copy(fontFamily = MonoFamily, fontSize = 17.sp),
@@ -256,7 +264,10 @@ fun StatsScreen(viewModel: AtlasViewModel) {
                             textAlign = TextAlign.End,
                             modifier = Modifier.width(52.dp),
                         )
-                        TimelineSpine(isLast = index == stats.timeline.lastIndex)
+                        TimelineSpine(
+                            isFirst = index == 0,
+                            isLast = index == stats.timeline.lastIndex,
+                        )
                         Column(Modifier.padding(bottom = 18.dp)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(
@@ -378,26 +389,30 @@ private fun DataRow(title: String, subtitle: String, onClick: () -> Unit) {
 }
 
 @Composable
-private fun TimelineSpine(isLast: Boolean) {
+private fun TimelineSpine(isFirst: Boolean, isLast: Boolean) {
     val palette = Countri.palette
     Canvas(
         Modifier
             .padding(horizontal = 16.dp)
             .width(10.dp)
-            .height(if (isLast) 24.dp else 44.dp)
+            .fillMaxHeight()
     ) {
+        // One unbroken line behind the dots: each row's segment runs edge to
+        // edge, so consecutive rows join seamlessly.
+        val cx = size.width / 2f
+        val dotY = 7.dp.toPx()
+        val top = if (isFirst) dotY else 0f
+        val bottom = if (isLast) dotY else size.height
+        drawRect(
+            color = palette.textPrimary.copy(alpha = 0.10f),
+            topLeft = Offset(cx - 0.75.dp.toPx(), top),
+            size = Size(1.5.dp.toPx(), bottom - top),
+        )
         drawCircle(
             color = palette.visited,
             radius = 4.dp.toPx(),
-            center = Offset(size.width / 2f, 7.dp.toPx()),
+            center = Offset(cx, dotY),
         )
-        if (!isLast) {
-            drawRect(
-                color = palette.textPrimary.copy(alpha = 0.10f),
-                topLeft = Offset(size.width / 2f - 0.75.dp.toPx(), 13.dp.toPx()),
-                size = Size(1.5.dp.toPx(), size.height - 13.dp.toPx()),
-            )
-        }
     }
 }
 

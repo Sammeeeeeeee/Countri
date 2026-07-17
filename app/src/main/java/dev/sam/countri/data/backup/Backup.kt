@@ -19,6 +19,8 @@ data class BackupState(
     val note: String? = null,
     val tags: List<String> = emptyList(),
     val trips: Int = 0,
+    // Null in pre-dual-state backups; restore derives it from status then.
+    val wishlisted: Boolean? = null,
 )
 
 @Serializable
@@ -51,7 +53,10 @@ object Backup {
             BackupData(
                 version = CURRENT_VERSION,
                 states = states.map {
-                    BackupState(it.iso2, it.status, it.firstVisitYear, it.note, it.tags, it.trips)
+                    BackupState(
+                        it.iso2, it.status, it.firstVisitYear, it.note, it.tags, it.trips,
+                        it.wishlisted,
+                    )
                 },
                 visits = visits.map {
                     BackupVisit(it.iso2, it.startDay, it.endDay, it.cities)

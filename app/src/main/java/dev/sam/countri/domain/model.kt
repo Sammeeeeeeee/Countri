@@ -27,14 +27,18 @@ data class CountryWithState(
     /** Legacy year for entries created before visits existed. */
     val firstVisitYear: Int? = null,
     val note: String? = null,
-    /** Places to see / seen — Wikipedia titles, linkable. */
+    /** Places to see / seen — linkable. */
     val places: List<String> = emptyList(),
     /** Legacy trip count for entries without visit records. */
     val trips: Int = 0,
     val visits: List<Visit> = emptyList(),
+    /** Rides alongside status: a visited country can still be wished for. */
+    val wishlisted: Boolean = false,
 ) {
     val isVisited get() = status == CountryStatus.VISITED
-    val isWishlist get() = status == CountryStatus.WISHLIST
+    // The flag is the source of truth, but a bare WISHLIST status is by
+    // definition wished-for — no construction path may lose that meaning.
+    val isWishlist get() = wishlisted || status == CountryStatus.WISHLIST
 
     /** Year of the earliest visit; falls back to the legacy year. */
     val firstYear: Int? get() = visits.minOfOrNull { it.start.year } ?: firstVisitYear

@@ -11,6 +11,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import dev.sam.countri.CountriApp
 import dev.sam.countri.data.catalog.CountryCatalog
 import dev.sam.countri.data.cities.CityData
+import dev.sam.countri.data.map.DetailMapData
 import dev.sam.countri.data.map.WorldMapData
 import dev.sam.countri.data.prefs.OnboardingPrefs
 import dev.sam.countri.data.repo.AtlasRepository
@@ -40,6 +41,7 @@ class AtlasViewModel(
     private val onboardingPrefs: OnboardingPrefs,
     val worldMap: WorldMapData,
     val cities: CityData,
+    val detailMap: DetailMapData? = null,
 ) : ViewModel() {
 
     private val emptyAtlas = CountryCatalog.all.map { CountryWithState(it) }
@@ -77,6 +79,12 @@ class AtlasViewModel(
             repository.setStatus(iso2, status, existing)
             if (status == CountryStatus.VISITED) pulse(iso2)
         }
+    }
+
+    /** Wishlist is a flag, not a rival state — visited countries can carry it too. */
+    fun setWishlisted(iso2: String, wishlisted: Boolean) {
+        val existing = byIso(iso2)
+        viewModelScope.launch { repository.setWishlisted(iso2, wishlisted, existing) }
     }
 
     /** Records a trip; the country becomes visited if it wasn't already. */
@@ -146,6 +154,7 @@ class AtlasViewModel(
                     onboardingPrefs = app.container.onboardingPrefs,
                     worldMap = app.container.worldMap,
                     cities = app.container.cities,
+                    detailMap = app.container.detailMap,
                 )
             }
         }

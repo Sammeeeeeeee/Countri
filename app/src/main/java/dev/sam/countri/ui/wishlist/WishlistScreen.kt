@@ -124,7 +124,11 @@ fun WishlistScreen(
                                 color = palette.textPrimary,
                             )
                             Text(
-                                entry.country.continent.displayName,
+                                // A visited country can still sit on the list
+                                // — say so instead of hiding it.
+                                if (entry.isVisited)
+                                    "${entry.country.continent.displayName}  ·  Visited"
+                                else entry.country.continent.displayName,
                                 style = CountriType.bodySmall,
                                 color = palette.textFaint,
                                 modifier = Modifier.padding(top = 2.dp),

@@ -73,7 +73,10 @@ fun Modifier.pressScale(scaleDown: Float = 0.965f): Modifier = composed {
  * apart. Runs once per [key] change.
  */
 fun Modifier.staggeredEnter(index: Int, key: Any? = Unit, riseDistance: Dp = 16.dp): Modifier =
-    composed {
+    // The flourish belongs to the first screenful only. Rows that arrive by
+    // scrolling must be readable the instant they appear — a list you can't
+    // skim mid-fling is a list you can't navigate.
+    if (index > 14) this else composed {
         var shown by remember(key) { mutableStateOf(false) }
         val progress by animateFloatAsState(
             targetValue = if (shown) 1f else 0f,

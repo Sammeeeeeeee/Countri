@@ -182,7 +182,9 @@ fun AddCountryScreen(
                 CountryRow(
                     entry = entry,
                     modifier = Modifier.staggeredEnter(
-                        index = filtered.indexOf(entry).coerceAtMost(14),
+                        // Real index: rows beyond the first screenful skip the
+                        // animation entirely, so scroll-by reading works.
+                        index = filtered.indexOf(entry),
                         key = query.isEmpty(), // stagger once, not per keystroke
                     ),
                 ) {
@@ -199,7 +201,13 @@ fun AddCountryScreen(
             entry = quickEntry,
             onDismiss = { quickIso = null },
             onConfirm = { status ->
-                viewModel.setStatus(quickEntry.country.iso2, status)
+                // Wishlist adds the flag without ever demoting a visited
+                // country; visited marks status and leaves the flag alone.
+                if (status == CountryStatus.WISHLIST) {
+                    viewModel.setWishlisted(quickEntry.country.iso2, true)
+                } else {
+                    viewModel.setStatus(quickEntry.country.iso2, status)
+                }
                 haptics.confirm()
                 quickIso = null
                 // Land on the country's own page to add the details.
@@ -235,16 +243,25 @@ private fun CountryRow(
                 color = palette.textFaint,
             )
         }
-        val label = when (entry.status) {
-            CountryStatus.VISITED -> "Visited"
-            CountryStatus.WISHLIST -> "Wishlist"
-            null -> null
+        val label = when {
+            entry.isVisited -> "Visited"
+            entry.isWishlist -> "Wishlist"
+            else -> null
         }
         if (label != null) {
             Text(
                 label.uppercase(),
                 style = CountriType.monoSmall,
                 color = if (entry.isVisited) palette.visited else palette.wishlist,
+            )
+        }
+        // Visited AND still wished for: a small bookmark says so.
+        if (entry.isVisited && entry.isWishlist) {
+            Icon(
+                CountriIcons.Wishlist,
+                contentDescription = "On the wishlist",
+                tint = palette.wishlist,
+                modifier = Modifier.size(11.dp),
             )
         }
         Box(
