@@ -43,8 +43,8 @@ KT_OUT = os.path.join(
     "data", "catalog", "CountryCatalog.kt")
 
 GEOJSON_URLS = [
-    "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_110m_admin_0_countries.geojson",
-    "https://raw.githubusercontent.com/martynafford/natural-earth-geojson/master/110m/cultural/ne_110m_admin_0_countries.json",
+    "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_50m_admin_0_countries.geojson",
+    "https://raw.githubusercontent.com/martynafford/natural-earth-geojson/master/50m/cultural/ne_50m_admin_0_countries.json",
 ]
 
 # Natural Earth quirks: ISO_A2 == "-99" for these; map from ADM0_A3 instead.
@@ -59,7 +59,7 @@ CHIP_RADIUS_DEG = 0.55  # small but visibly tappable at world zoom
 
 def fetch_geojson():
     os.makedirs(CACHE, exist_ok=True)
-    path = os.path.join(CACHE, "ne_110m_admin_0.geojson")
+    path = os.path.join(CACHE, "ne_50m_admin_0.geojson")
     if not os.path.exists(path):
         last_err = None
         for url in GEOJSON_URLS:
@@ -166,7 +166,7 @@ def make_chip(lon, lat):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--tolerance", type=float, default=0.22,
+    ap.add_argument("--tolerance", type=float, default=0.09,
                     help="Douglas-Peucker tolerance in degrees")
     args = ap.parse_args()
 
@@ -193,8 +193,13 @@ def main():
         for poly in polys:
             for ring in poly:  # exterior first, then holes; same tag, even-odd fill
                 simplified = simplify_ring([(p[0], p[1]) for p in ring], args.tolerance)
-                if len(simplified) >= 4:
-                    rings.append((idx, simplified))
+                if len(simplified) < 4:
+                    continue
+                # Deep-south specks (South Sandwich etc.) sit below the
+                # rendered band; drop them rather than smear the crop.
+                if max(p[1] for p in simplified) < -56.5:
+                    continue
+                rings.append((idx, simplified))
 
     missing = [c for c in catalog if c["iso2"] not in seen_iso]
     for c in missing:
@@ -204,7 +209,7 @@ def main():
 
     total_vertices = sum(len(r) for _, r in rings)
     print(f"rings: {len(rings)}, vertices: {total_vertices}")
-    if total_vertices > 9500:
+    if total_vertices > 26000:
         print("WARNING: vertex budget exceeded — raise --tolerance", file=sys.stderr)
 
     buf = bytearray()

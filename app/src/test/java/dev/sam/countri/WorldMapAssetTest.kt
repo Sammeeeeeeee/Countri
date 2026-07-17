@@ -28,8 +28,8 @@ class WorldMapAssetTest {
 
     @Test
     fun `asset parses with a sane shape budget`() {
-        assertTrue("rings: ${data.ringCount}", data.ringCount in 200..600)
-        assertTrue("vertices: ${data.vertexCount}", data.vertexCount in 6000..12000)
+        assertTrue("rings: ${data.ringCount}", data.ringCount in 200..2200)
+        assertTrue("vertices: ${data.vertexCount}", data.vertexCount in 6000..27000)
     }
 
     @Test

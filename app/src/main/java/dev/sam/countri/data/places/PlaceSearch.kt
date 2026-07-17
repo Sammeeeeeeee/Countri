@@ -67,6 +67,7 @@ object PlaceSearch {
                         val base = (props["osm_value"]?.jsonPrimitive?.content
                             ?.takeUnless { it == "yes" } ?: key)
                             ?.replace('_', ' ')
+                            ?.replaceFirstChar { it.uppercaseChar() }
                         val kind = if (inCountry) base else {
                             listOfNotNull(base, props["country"]?.jsonPrimitive?.content)
                                 .joinToString("  ·  ")

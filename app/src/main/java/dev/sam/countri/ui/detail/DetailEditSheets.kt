@@ -225,7 +225,7 @@ private fun PlacesEditor(entry: CountryWithState, onSave: (List<String>) -> Unit
             suggestions = emptyList()
             return@LaunchedEffect
         }
-        delay(280)
+        delay(150)
         suggestions = PlaceSearch.search(
             q,
             entry.country.iso2,

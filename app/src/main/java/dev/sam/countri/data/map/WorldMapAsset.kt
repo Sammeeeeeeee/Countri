@@ -2,8 +2,11 @@ package dev.sam.countri.data.map
 
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import kotlin.math.PI
 import kotlin.math.cos
+import kotlin.math.ln
 import kotlin.math.sin
+import kotlin.math.tan
 
 /**
  * Parsed contents of assets/worldmap.bin (see tools/generate_map.py for the
@@ -27,6 +30,10 @@ class WorldMapData(
     val uy = FloatArray(vertexCount)
     val uz = FloatArray(vertexCount)
 
+    // Mercator y per vertex (pseudo-degrees), so the flat projection keeps
+    // country shapes true without per-frame trig.
+    val mercY = FloatArray(vertexCount)
+
     // Per-ring bounding boxes for hit-test candidate filtering.
     private val bboxMinLon = FloatArray(ringCount)
     private val bboxMaxLon = FloatArray(ringCount)
@@ -35,11 +42,12 @@ class WorldMapData(
 
     init {
         for (i in 0 until vertexCount) {
-            val la = Math.toRadians(lat[i].toDouble())
+            val la = Math.toRadians(lat[i].toDouble().coerceIn(-89.0, 89.0))
             val lo = Math.toRadians(lon[i].toDouble())
             ux[i] = (cos(la) * sin(lo)).toFloat()
             uy[i] = sin(la).toFloat()
             uz[i] = (cos(la) * cos(lo)).toFloat()
+            mercY[i] = Math.toDegrees(ln(tan(PI / 4.0 + la / 2.0))).toFloat()
         }
         for (r in 0 until ringCount) {
             var minLon = Float.MAX_VALUE; var maxLon = -Float.MAX_VALUE

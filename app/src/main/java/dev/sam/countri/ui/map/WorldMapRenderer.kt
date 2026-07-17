@@ -164,6 +164,7 @@ class WorldMapRenderer(private val data: WorldMapData) {
             val gFade = ((viewport.zoom - 1.5f) / 1.2f).coerceIn(0f, 1f)
             if (gFade > 0f) {
                 val s = MapProjection.flatScale(w, h, viewport.zoom)
+                val mercCenter = MapProjection.mercY(viewport.centerLat)
                 gridPaint.color = colors.label
                 gridPaint.alpha = (gFade * 15).toInt()
                 gridPaint.strokeWidth = 1f
@@ -175,7 +176,7 @@ class WorldMapRenderer(private val data: WorldMapData) {
                 }
                 var lat = -60
                 while (lat <= 75) {
-                    val gy = h / 2f - (lat - viewport.centerLat) * s
+                    val gy = h / 2f - (MapProjection.mercY(lat.toFloat()) - mercCenter) * s
                     if (gy > -1f && gy < h + 1f) canvas.drawLine(0f, gy, w, gy, gridPaint)
                     lat += 15
                 }
@@ -237,6 +238,7 @@ class WorldMapRenderer(private val data: WorldMapData) {
         if (morph <= 0.01f && viewport.zoom >= LABEL_MIN_ZOOM) {
             val fade = ((viewport.zoom - LABEL_MIN_ZOOM) / 0.8f).coerceIn(0f, 1f)
             val s = MapProjection.flatScale(w, h, viewport.zoom)
+            val mercCenter = MapProjection.mercY(viewport.centerLat)
             // Type grows a touch as the map closes in.
             val ts = (10.5f + 1.8f * ((viewport.zoom - LABEL_MIN_ZOOM) / 3f).coerceIn(0f, 1f)) * density
             labelPaint.textSize = ts
@@ -253,7 +255,7 @@ class WorldMapRenderer(private val data: WorldMapData) {
                     if ((pass == 0) != visited) continue
                     val country = CountryCatalog.all[idx - 1]
                     val lx = w / 2f + (country.lon - viewport.centerLon) * s
-                    val ly = h / 2f - (country.lat - viewport.centerLat) * s
+                    val ly = h / 2f - (MapProjection.mercY(country.lat) - mercCenter) * s
                     if (lx < -60f || lx > w + 60f || ly < -20f || ly > h + 20f) continue
                     val tw = labelPaint.measureText(country.name)
                     val rect = android.graphics.RectF(

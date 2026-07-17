@@ -132,7 +132,9 @@ fun WorldMap(
                     ) {
                         val s = MapProjection.flatScale(canvasSize.width, canvasSize.height, state.zoom)
                         state.centerLon -= state.flatVelX * dt / s
-                        state.centerLat += state.flatVelY * dt / s
+                        state.centerLat = MapProjection.invMercY(
+                            MapProjection.mercY(state.centerLat) + state.flatVelY * dt / s
+                        )
                         state.clampCamera(canvasSize.width, canvasSize.height)
                         val decay = exp(-dt * 3.0f)
                         state.flatVelX *= decay
@@ -185,6 +187,7 @@ fun WorldMap(
                     var flatVelXEma = 0f
                     var flatVelYEma = 0f
                     var globePinch = 1f
+                    var flatFloorPinch = 1f
                     while (true) {
                         val event = awaitPointerEvent()
                         if (event.changes.none { it.pressed }) break
@@ -228,7 +231,8 @@ fun WorldMap(
                             val sOld = MapProjection.flatScale(w, h, state.zoom)
                             if (zoomChange != 1f && centroid.isSpecified) {
                                 val geoLon = state.centerLon + (centroid.x - w / 2f) / sOld
-                                val geoLat = state.centerLat - (centroid.y - h / 2f) / sOld
+                                val geoMerc = MapProjection.mercY(state.centerLat) +
+                                    (h / 2f - centroid.y) / sOld
                                 val rawZoom = state.zoom * zoomChange
                                 state.zoom = when {
                                     rawZoom < 1f -> 1f - (1f - rawZoom) * 0.45f
@@ -238,11 +242,31 @@ fun WorldMap(
                                 }.coerceIn(0.72f, WorldMapState.MAX_ZOOM * 1.18f)
                                 val sNew = MapProjection.flatScale(w, h, state.zoom)
                                 state.centerLon = geoLon - (centroid.x - w / 2f) / sNew
-                                state.centerLat = geoLat + (centroid.y - h / 2f) / sNew
+                                state.centerLat = MapProjection.invMercY(
+                                    geoMerc - (h / 2f - centroid.y) / sNew
+                                )
+                                // Keep pinching at the floor and the map wraps
+                                // itself back onto the globe.
+                                if (state.zoom <= 1.01f) {
+                                    flatFloorPinch *= zoomChange
+                                    val handoff = modeChange
+                                    if (flatFloorPinch < 0.82f && handoff != null) {
+                                        state.rotationDeg = -state.centerLon
+                                        state.zoom = 1f
+                                        state.flatVelX = 0f
+                                        state.flatVelY = 0f
+                                        handoff(MapMode.Globe)
+                                        break
+                                    }
+                                } else {
+                                    flatFloorPinch = 1f
+                                }
                             }
                             val s = MapProjection.flatScale(w, h, state.zoom)
                             state.centerLon -= pan.x / s
-                            state.centerLat += pan.y / s
+                            state.centerLat = MapProjection.invMercY(
+                                MapProjection.mercY(state.centerLat) + pan.y / s
+                            )
                             state.clampCamera(w, h)
                             flatVelXEma = flatVelXEma * 0.7f + (pan.x / dtMs * 1000f) * 0.3f
                             flatVelYEma = flatVelYEma * 0.7f + (pan.y / dtMs * 1000f) * 0.3f
@@ -282,7 +306,8 @@ fun WorldMap(
                             val h = canvasSize.height
                             val sOld = MapProjection.flatScale(w, h, state.zoom)
                             val geoLon = state.centerLon + (offset.x - w / 2f) / sOld
-                            val geoLat = state.centerLat - (offset.y - h / 2f) / sOld
+                            val geoMerc = MapProjection.mercY(state.centerLat) +
+                                (h / 2f - offset.y) / sOld
                             val targetZoom = if (state.zoom > 5.5f) 1f else state.zoom * 2.2f
                             scope.launch {
                                 val fromZoom = state.zoom
@@ -290,7 +315,9 @@ fun WorldMap(
                                     state.zoom = fromZoom + (targetZoom.coerceIn(1f, WorldMapState.MAX_ZOOM) - fromZoom) * t
                                     val s = MapProjection.flatScale(w, h, state.zoom)
                                     state.centerLon = geoLon - (offset.x - w / 2f) / s
-                                    state.centerLat = geoLat + (offset.y - h / 2f) / s
+                                    state.centerLat = MapProjection.invMercY(
+                                        geoMerc - (h / 2f - offset.y) / s
+                                    )
                                     state.clampCamera(w, h)
                                 }
                             }

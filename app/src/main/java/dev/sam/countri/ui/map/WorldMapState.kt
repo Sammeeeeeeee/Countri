@@ -28,18 +28,20 @@ class WorldMapState(initialMode: MapMode) {
     /**
      * Keeps the camera center inside the world band. Zoom is deliberately
      * left alone so pinches can rubber-band past the limits and spring back.
+     * The vertical clamp happens in Mercator space, where the map is linear.
      */
     fun clampCamera(w: Float, h: Float) {
         val s = MapProjection.flatScale(w, h, zoom)
         val halfLon = w / (2f * s)
-        val halfLat = h / (2f * s)
+        val halfMerc = h / (2f * s)
         centerLon = clampCentered(centerLon, -180f + halfLon, 180f - halfLon, 11f)
-        centerLat = clampCentered(
-            centerLat,
-            MapProjection.MIN_LAT + halfLat,
-            MapProjection.MAX_LAT - halfLat,
-            16f,
+        val clampedMerc = clampCentered(
+            MapProjection.mercY(centerLat),
+            MapProjection.mercY(MapProjection.MIN_LAT) + halfMerc,
+            MapProjection.mercY(MapProjection.MAX_LAT) - halfMerc,
+            MapProjection.mercY(43.3f),
         )
+        centerLat = MapProjection.invMercY(clampedMerc)
     }
 
     private fun clampCentered(v: Float, min: Float, max: Float, fallback: Float): Float =

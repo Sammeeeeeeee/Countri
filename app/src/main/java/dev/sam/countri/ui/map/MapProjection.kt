@@ -2,12 +2,16 @@ package dev.sam.countri.ui.map
 
 import dev.sam.countri.data.map.WorldMapData
 import kotlin.math.asin
+import kotlin.math.atan
 import kotlin.math.atan2
 import kotlin.math.cos
+import kotlin.math.exp
+import kotlin.math.ln
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sin
 import kotlin.math.sqrt
+import kotlin.math.tan
 
 /**
  * Where the flat map looks. zoom 1 covers the world (crop-to-fill); larger
@@ -19,26 +23,39 @@ data class MapViewport(
     val zoom: Float,
 ) {
     companion object {
-        // Center of the rendered lat band (-56..83.5).
-        val World = MapViewport(11f, 16f, 1f)
+        // Center of the rendered Mercator band (-56..83.5).
+        val World = MapViewport(11f, 43.3f, 1f)
     }
 }
 
 /**
  * Pure projection math shared by the renderer, hit-testing, and tests.
- * Flat = equirectangular; globe = orthographic with a fixed aesthetic tilt;
- * morph linearly interpolates the two screen positions per vertex.
+ * Flat = Mercator, so countries keep their true shapes (no more squashed
+ * high-latitude coastlines); globe = orthographic with a fixed aesthetic
+ * tilt; morph linearly interpolates the two screen positions per vertex.
  */
 object MapProjection {
 
     const val MIN_LAT = -56f
     const val MAX_LAT = 83.5f
-    private const val LAT_SPAN = MAX_LAT - MIN_LAT // 139.5
     private const val TILT_DEG = 12f
 
-    /** Degrees→pixels scale for the flat map (crop-to-fill the canvas). */
+    /** Mercator y in pseudo-degrees — matches longitude scale at the equator. */
+    fun mercY(latDeg: Float): Float {
+        val rad = Math.toRadians(latDeg.toDouble().coerceIn(-89.0, 89.0))
+        return Math.toDegrees(ln(tan(Math.PI / 4.0 + rad / 2.0))).toFloat()
+    }
+
+    fun invMercY(yPseudo: Float): Float {
+        val rad = Math.toRadians(yPseudo.toDouble())
+        return Math.toDegrees(2.0 * atan(exp(rad)) - Math.PI / 2.0).toFloat()
+    }
+
+    private val MERC_SPAN = mercY(MAX_LAT) - mercY(MIN_LAT)
+
+    /** Pseudo-degrees→pixels scale for the flat map (crop-to-fill the canvas). */
     fun flatScale(w: Float, h: Float, zoom: Float): Float =
-        max(w / 360f, h / LAT_SPAN) * zoom
+        max(w / 360f, h / MERC_SPAN) * zoom
 
     fun globeRadius(w: Float, h: Float): Float = min(w, h) * 0.42f
 
@@ -62,6 +79,7 @@ object MapProjection {
         val cy = h / 2f
         val s = flatScale(w, h, viewport.zoom)
         val r = globeRadius(w, h)
+        val mercCenter = mercY(viewport.centerLat)
         val phi = Math.toRadians(rotationDeg.toDouble())
         val cosP = cos(phi).toFloat()
         val sinP = sin(phi).toFloat()
@@ -70,7 +88,7 @@ object MapProjection {
         val sinT = sin(tau).toFloat()
         val n = data.vertexCount
         val lon = data.lon
-        val lat = data.lat
+        val my = data.mercY
         val ux = data.ux
         val uy = data.uy
         val uz = data.uz
@@ -78,7 +96,7 @@ object MapProjection {
 
         for (i in 0 until n) {
             val fx = cx + (lon[i] - viewport.centerLon) * s
-            val fy = cy - (lat[i] - viewport.centerLat) * s
+            val fy = cy - (my[i] - mercCenter) * s
             if (flatOnly) {
                 outX[i] = fx
                 outY[i] = fy
@@ -107,8 +125,8 @@ object MapProjection {
     ): Pair<Float, Float>? {
         val s = flatScale(w, h, viewport.zoom)
         val lon = viewport.centerLon + (x - w / 2f) / s
-        val lat = viewport.centerLat - (y - h / 2f) / s
-        if (lon < -180f || lon > 180f || lat < -90f || lat > 90f) return null
+        val lat = invMercY(mercY(viewport.centerLat) + (h / 2f - y) / s)
+        if (lon < -180f || lon > 180f) return null
         return lon to lat
     }
 
