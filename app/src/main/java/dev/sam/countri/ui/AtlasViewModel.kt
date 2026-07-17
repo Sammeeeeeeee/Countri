@@ -20,6 +20,7 @@ import dev.sam.countri.domain.CountryStatus
 import dev.sam.countri.domain.CountryWithState
 import dev.sam.countri.domain.StatsCalculator
 import dev.sam.countri.ui.map.MapMode
+import dev.sam.countri.ui.map.WorldMapState
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -61,6 +62,9 @@ class AtlasViewModel(
 
     /** Atlas map view state survives tab hops. */
     var mapMode by mutableStateOf(MapMode.Flat)
+
+    /** The camera itself — pan, zoom, globe spin — survives them too. */
+    val mapState = WorldMapState(MapMode.Flat)
 
     /** The globe-unwrap opening plays once per process. */
     var introPlayed: Boolean = false

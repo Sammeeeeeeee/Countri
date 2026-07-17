@@ -55,7 +55,19 @@ class WorldMapRenderer(private val data: WorldMapData) {
     private val depthSum = FloatArray(countryCount)
     private val depthCount = IntArray(countryCount)
 
+    /** Vertex mass per country — a cheap area proxy for label priority. */
+    private val countryVerts = IntArray(countryCount).also { arr ->
+        for (r in 0 until data.ringCount) arr[data.ringCountry[r]] += data.ringSize[r]
+    }
+
+    /** Big countries first: when labels compete for space, they win. */
+    private val labelOrder: IntArray = (1 until countryCount)
+        .sortedByDescending { countryVerts[it] }
+        .toIntArray()
+    private val labelRects = ArrayList<android.graphics.RectF>(64)
+
     private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
+    private val gridPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
     private val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
         strokeJoin = Paint.Join.ROUND
@@ -147,6 +159,29 @@ class WorldMapRenderer(private val data: WorldMapData) {
             canvas.drawPath(paths[c], strokePaint)
         }
 
+        // ---- graticule: faint atlas grid, appearing as the map closes in ----
+        if (morph <= 0.01f) {
+            val gFade = ((viewport.zoom - 1.5f) / 1.2f).coerceIn(0f, 1f)
+            if (gFade > 0f) {
+                val s = MapProjection.flatScale(w, h, viewport.zoom)
+                gridPaint.color = colors.label
+                gridPaint.alpha = (gFade * 15).toInt()
+                gridPaint.strokeWidth = 1f
+                var lon = -180
+                while (lon <= 180) {
+                    val gx = w / 2f + (lon - viewport.centerLon) * s
+                    if (gx > -1f && gx < w + 1f) canvas.drawLine(gx, 0f, gx, h, gridPaint)
+                    lon += 15
+                }
+                var lat = -60
+                while (lat <= 75) {
+                    val gy = h / 2f - (lat - viewport.centerLat) * s
+                    if (gy > -1f && gy < h + 1f) canvas.drawLine(0f, gy, w, gy, gridPaint)
+                    lat += 15
+                }
+            }
+        }
+
         // ---- tracked-country chrome ----
         if (dashScale != density) {
             dashScale = density
@@ -202,21 +237,42 @@ class WorldMapRenderer(private val data: WorldMapData) {
         if (morph <= 0.01f && viewport.zoom >= LABEL_MIN_ZOOM) {
             val fade = ((viewport.zoom - LABEL_MIN_ZOOM) / 0.8f).coerceIn(0f, 1f)
             val s = MapProjection.flatScale(w, h, viewport.zoom)
-            labelPaint.textSize = 11f * density
-            labelHaloPaint.textSize = 11f * density
+            // Type grows a touch as the map closes in.
+            val ts = (10.5f + 1.8f * ((viewport.zoom - LABEL_MIN_ZOOM) / 3f).coerceIn(0f, 1f)) * density
+            labelPaint.textSize = ts
+            labelHaloPaint.textSize = ts
             labelHaloPaint.strokeWidth = 3f * density
             labelPaint.color = colors.label
-            labelPaint.alpha = (fade * 235).toInt()
             labelHaloPaint.color = colors.labelHalo
-            labelHaloPaint.alpha = (fade * 200).toInt()
-            val catalog = CountryCatalog.all
-            for (i in catalog.indices) {
-                val country = catalog[i]
-                val x = w / 2f + (country.lon - viewport.centerLon) * s
-                val y = h / 2f - (country.lat - viewport.centerLat) * s
-                if (x < -60f || x > w + 60f || y < -20f || y > h + 20f) continue
-                canvas.drawText(country.name, x, y, labelHaloPaint)
-                canvas.drawText(country.name, x, y, labelPaint)
+            // Visited countries claim their spots first, then the rest fill
+            // in by size — and nothing ever prints over anything.
+            labelRects.clear()
+            for (pass in 0..1) {
+                for (idx in labelOrder) {
+                    val visited = statuses[idx] == CountryStatus.VISITED
+                    if ((pass == 0) != visited) continue
+                    val country = CountryCatalog.all[idx - 1]
+                    val lx = w / 2f + (country.lon - viewport.centerLon) * s
+                    val ly = h / 2f - (country.lat - viewport.centerLat) * s
+                    if (lx < -60f || lx > w + 60f || ly < -20f || ly > h + 20f) continue
+                    val tw = labelPaint.measureText(country.name)
+                    val rect = android.graphics.RectF(
+                        lx - tw / 2f - 4f, ly - ts, lx + tw / 2f + 4f, ly + 4f,
+                    )
+                    var clash = false
+                    for (r in labelRects.indices) {
+                        if (android.graphics.RectF.intersects(labelRects[r], rect)) {
+                            clash = true
+                            break
+                        }
+                    }
+                    if (clash) continue
+                    labelRects.add(rect)
+                    labelPaint.alpha = (fade * if (visited) 240 else 195).toInt()
+                    labelHaloPaint.alpha = (fade * 200).toInt()
+                    canvas.drawText(country.name, lx, ly, labelHaloPaint)
+                    canvas.drawText(country.name, lx, ly, labelPaint)
+                }
             }
         }
     }

@@ -399,6 +399,8 @@ private fun AtlasMap(
         data = viewModel.worldMap,
         statuses = statuses,
         mode = viewModel.mapMode,
+        // Camera lives in the view model: leave, come back, it's as left.
+        state = viewModel.mapState,
         introUnwrap = !viewModel.introPlayed,
         onIntroConsumed = { viewModel.introPlayed = true },
         justAddedIso = justAdded,

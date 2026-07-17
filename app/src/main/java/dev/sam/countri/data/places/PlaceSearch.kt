@@ -15,23 +15,29 @@ data class FoundPlace(val name: String, val kind: String?)
 /**
  * Search-as-you-type against Photon (komoot's OpenStreetMap search) —
  * free, keyless, and actually built for autocomplete, so half-typed
- * names match. Results are filtered to the country being edited and to
- * things worth travelling for; failures degrade to no suggestions and
- * typing is never blocked on the network.
+ * names match. The country being edited ranks first (with a location
+ * bias toward it), but the world stays reachable: a match abroad shows
+ * up labelled with its country instead of vanishing into an empty list.
+ * Failures degrade to no suggestions; typing is never blocked.
  */
 object PlaceSearch {
 
     // Geography, sights and nature — not shops and offices.
     private val junkKeys = setOf("shop", "office", "craft", "highway", "emergency")
 
-    suspend fun search(query: String, iso2: String): List<FoundPlace> =
+    suspend fun search(
+        query: String,
+        iso2: String,
+        biasLat: Float,
+        biasLon: Float,
+    ): List<FoundPlace> =
         withContext(Dispatchers.IO) {
             val q = query.trim()
             if (q.length < 2) return@withContext emptyList()
             runCatching {
                 val url = URL(
                     "https://photon.komoot.io/api/?q=" + URLEncoder.encode(q, "UTF-8") +
-                        "&limit=18&lang=en"
+                        "&limit=18&lang=en&lat=$biasLat&lon=$biasLon"
                 )
                 val connection = (url.openConnection() as HttpURLConnection).apply {
                     connectTimeout = 4_000
@@ -46,28 +52,38 @@ object PlaceSearch {
                     val body = connection.inputStream.bufferedReader().readText()
                     val features = Json.parseToJsonElement(body)
                         .jsonObject["features"]?.jsonArray ?: return@runCatching emptyList()
-                    features.mapNotNull { feature ->
+                    val parsed = features.mapNotNull { feature ->
                         val props = feature.jsonObject["properties"]?.jsonObject
                             ?: return@mapNotNull null
-                        val cc = props["countrycode"]?.jsonPrimitive?.content
-                        if (!iso2.equals(cc, ignoreCase = true)) return@mapNotNull null
                         val key = props["osm_key"]?.jsonPrimitive?.content
                         if (key in junkKeys) return@mapNotNull null
                         val name = props["name"]?.jsonPrimitive?.content
                             ?.takeUnless { it.isBlank() }
                             ?: return@mapNotNull null
-                        val value = props["osm_value"]?.jsonPrimitive?.content
-                        FoundPlace(
-                            name = name,
-                            kind = (value?.takeUnless { it == "yes" } ?: key)
-                                ?.replace('_', ' '),
+                        val inCountry = iso2.equals(
+                            props["countrycode"]?.jsonPrimitive?.content,
+                            ignoreCase = true,
                         )
+                        val base = (props["osm_value"]?.jsonPrimitive?.content
+                            ?.takeUnless { it == "yes" } ?: key)
+                            ?.replace('_', ' ')
+                        val kind = if (inCountry) base else {
+                            listOfNotNull(base, props["country"]?.jsonPrimitive?.content)
+                                .joinToString("  ·  ")
+                                .ifBlank { null }
+                        }
+                        FoundPlace(name, kind) to inCountry
                     }
+                    val (home, away) = parsed.partition { it.second }
+                    (home + away)
+                        .map { it.first }
                         .distinctBy { it.name.lowercase() }
                         .take(6)
                 } finally {
                     connection.disconnect()
                 }
+            }.onFailure {
+                android.util.Log.w("Countri", "place search failed", it)
             }.getOrDefault(emptyList())
         }
 }
